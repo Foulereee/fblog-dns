@@ -1,0 +1,40 @@
+# fblog-dns CI/CD：push 到 main 分支 → 自动部署到 Cloudflare Workers
+#
+# 需要先在 GitHub 仓库配置两个 Secrets：
+#   CLOUDFLARE_API_TOKEN  -> 专门给 CI 用的 API Token（见 DEPLOY-GITHUB.md 第 2 步）
+#   CLOUDFLARE_ACCOUNT_ID -> 你 Cloudflare 的账号 ID（Workers 概览页右侧）
+#
+# Worker 自身的 4 个密钥（CF_API_TOKEN/CF_ZONE_ID/ADMIN_PASSWORD/SESSION_SECRET）
+# 存在 Cloudflare 侧，与本次部署无关，无需放进 GitHub。
+
+name: Deploy fblog-dns Worker
+
+on:
+  push:
+    branches: [main, master]
+  workflow_dispatch: {}
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Type check
+        run: npm run typecheck
+
+      - name: Deploy to Cloudflare Workers
+        run: npx wrangler deploy
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}

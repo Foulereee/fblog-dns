@@ -1,0 +1,19 @@
+{
+  "name": "fblog-dns",
+  "version": "0.1.0",
+  "private": true,
+  "description": "fblog.cyou 免费二级域名分发平台（Cloudflare Workers + D1）",
+  "scripts": {
+    "dev": "wrangler dev",
+    "deploy": "wrangler deploy",
+    "typecheck": "tsc --noEmit",
+    "db:create": "wrangler d1 create fblog-dns-db",
+    "db:init": "wrangler d1 execute fblog-dns-db --remote --file=schema.sql",
+    "db:init:local": "wrangler d1 execute fblog-dns-db --local --file=schema.sql"
+  },
+  "devDependencies": {
+    "@cloudflare/workers-types": "^5.20260911.1",
+    "typescript": "^5.5.0",
+    "wrangler": "^4.0.0"
+  }
+}

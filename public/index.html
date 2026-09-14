@@ -1,0 +1,335 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>fblog.cyou 免费二级域名分发平台</title>
+<style>
+  :root {
+    --bg: #0f172a;
+    --card: #1e293b;
+    --border: #334155;
+    --text: #e2e8f0;
+    --muted: #94a3b8;
+    --accent: #38bdf8;
+    --ok: #4ade80;
+    --danger: #f87171;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    font-family: system-ui, -apple-system, "PingFang SC", "Microsoft YaHei", sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    line-height: 1.6;
+  }
+  .wrap { max-width: 880px; margin: 0 auto; padding: 20px 16px 80px; }
+  header {
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 12px 0; border-bottom: 1px solid var(--border); margin-bottom: 24px;
+  }
+  h1 { font-size: 20px; margin: 0; }
+  h1 .accent { color: var(--accent); }
+  h2 { font-size: 16px; margin: 0 0 14px; }
+  .card {
+    background: var(--card); border: 1px solid var(--border);
+    border-radius: 12px; padding: 20px; margin-bottom: 18px;
+  }
+  label { display: block; margin-bottom: 12px; font-size: 14px; color: var(--muted); }
+  input, select {
+    display: block; width: 100%; margin-top: 6px;
+    padding: 10px 12px; border-radius: 8px; border: 1px solid var(--border);
+    background: #0b1220; color: var(--text); font-size: 14px;
+  }
+  input:focus, select:focus { outline: 2px solid var(--accent); border-color: transparent; }
+  button {
+    background: var(--accent); color: #082f49; border: none; border-radius: 8px;
+    padding: 10px 18px; font-size: 14px; font-weight: 600; cursor: pointer;
+  }
+  button:hover { filter: brightness(1.1); }
+  button.danger { background: transparent; color: var(--danger); border: 1px solid var(--danger); padding: 4px 10px; font-size: 12px; }
+  button.link { background: transparent; color: var(--muted); border: 1px solid var(--border); font-size: 13px; padding: 6px 12px; }
+  .row { display: flex; gap: 10px; align-items: flex-end; }
+  .row .grow { flex: 1; }
+  .fqdn { display: block; font-size: 13px; color: var(--muted); margin-top: 6px; }
+  .fqdn code { color: var(--accent); }
+  table { width: 100%; border-collapse: collapse; font-size: 14px; }
+  th, td { text-align: left; padding: 10px 8px; border-bottom: 1px solid var(--border); }
+  th { color: var(--muted); font-weight: 500; font-size: 13px; }
+  code { background: #0b1220; border: 1px solid var(--border); border-radius: 5px; padding: 2px 6px; font-size: 13px; }
+  .muted { color: var(--muted); font-size: 13px; }
+  .small { font-size: 12px; }
+  .msg { margin-top: 12px; padding: 10px 12px; border-radius: 8px; font-size: 14px; }
+  .msg.err { background: rgba(248,113,113,.12); color: var(--danger); border: 1px solid rgba(248,113,113,.3); }
+  .msg.ok { background: rgba(74,222,128,.12); color: var(--ok); border: 1px solid rgba(74,222,128,.3); }
+  .hidden { display: none !important; }
+  .notice { border-left: 3px solid var(--accent); padding: 10px 14px; background: rgba(56,189,248,.08); border-radius: 0 8px 8px 0; }
+  footer { margin-top: 40px; padding-top: 16px; border-top: 1px solid var(--border); color: var(--muted); font-size: 12px; }
+  #userbox { display: flex; align-items: center; gap: 10px; font-size: 14px; }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <h1>fblog<span class="accent">.cyou</span> 二级域名分发</h1>
+    <div id="userbox" class="hidden"></div>
+  </header>
+
+  <!-- 登录视图 -->
+  <div id="view-login" class="card hidden">
+    <h2>登录</h2>
+    <p class="muted">账号由管理员发放，请使用管理员提供的用户名和密码登录。</p>
+    <form id="login-form">
+      <label>用户名
+        <input id="login-username" autocomplete="username" required>
+      </label>
+      <label>密码
+        <input id="login-password" type="password" autocomplete="current-password" required>
+      </label>
+      <button type="submit">登录</button>
+    </form>
+    <div id="login-msg" class="msg hidden"></div>
+  </div>
+
+  <!-- 应用视图 -->
+  <div id="view-app" class="hidden">
+    <div class="card">
+      <h2>申请 / 更新子域名</h2>
+      <form id="create-form">
+        <div class="row">
+          <label class="grow">前缀
+            <input id="create-sub" placeholder="例如 myapp" required>
+            <span class="fqdn">完整域名：<code id="create-fqdn">xxx.fblog.cyou</code></span>
+          </label>
+          <label style="min-width:130px">类型
+            <select id="create-type">
+              <option value="A">A（IPv4）</option>
+              <option value="AAAA">AAAA（IPv6）</option>
+              <option value="CNAME">CNAME</option>
+            </select>
+          </label>
+        </div>
+        <label id="value-label">目标 IPv4
+          <input id="create-value" placeholder="例如 1.2.3.4" required>
+        </label>
+        <button type="submit">创建 / 更新</button>
+      </form>
+      <div id="create-msg" class="msg hidden"></div>
+      <p class="muted">说明：相同「前缀 + 类型」再次提交会更新为新的值；CNAME 与 A/AAAA 在同一前缀下互斥；A/AAAA/CNAME 均为「仅 DNS」模式（灰云），服务器与 HTTPS 证书由你自行负责。</p>
+    </div>
+
+    <div class="card">
+      <h2>我的子域名 <span class="muted small">配额：<span id="quota">0 / 10</span></span></h2>
+      <table>
+        <thead>
+          <tr><th>子域名</th><th>类型</th><th>值</th><th>创建日期</th><th>操作</th></tr>
+        </thead>
+        <tbody></tbody>
+      </table>
+      <div id="records-msg" class="msg hidden"></div>
+    </div>
+
+    <div class="notice">
+      使用须知：本平台免费为个人学习与项目提供 <code>*.fblog.cyou</code> 子域名。
+      禁止用于钓鱼、诈骗、盗版、垃圾邮件、赌博等违法或滥用用途；
+      平台管理员有权不经通知删除违规记录，并保留向有关部门举报的权利。
+    </div>
+  </div>
+
+  <footer>
+    fblog.cyou 免费二级域名分发平台 · 由 Cloudflare Workers + D1 驱动 ·
+    遇到问题或需要举报滥用，请联系平台管理员。
+  </footer>
+</div>
+
+<script>
+(function () {
+  'use strict';
+  var $ = function (sel) { return document.querySelector(sel); };
+  var state = { user: null, rootDomain: 'fblog.cyou' };
+
+  function api(path, opts) {
+    opts = opts || {};
+    var init = { method: opts.method || 'GET', headers: { 'Content-Type': 'application/json' } };
+    if (opts.body) init.body = JSON.stringify(opts.body);
+    return fetch(path, init).then(function (res) {
+      return res.json().catch(function () { return null; }).then(function (data) {
+        if (!res.ok) {
+          throw new Error((data && data.error) || ('请求失败（HTTP ' + res.status + '）'));
+        }
+        return data;
+      });
+    });
+  }
+
+  function showMsg(el, text, isOk) {
+    el.textContent = text;
+    el.className = 'msg ' + (isOk ? 'ok' : 'err');
+  }
+
+  function renderUserBox() {
+    var box = $('#userbox');
+    box.classList.remove('hidden');
+    box.textContent = '';
+    var name = document.createElement('span');
+    name.textContent = state.user;
+    var logout = document.createElement('button');
+    logout.type = 'button';
+    logout.className = 'link';
+    logout.textContent = '退出登录';
+    logout.addEventListener('click', function () {
+      api('/api/logout', { method: 'POST' }).catch(function () {}).then(function () {
+        state.user = null;
+        showLogin();
+      });
+    });
+    box.appendChild(name);
+    box.appendChild(logout);
+  }
+
+  function showLogin() {
+    $('#view-app').classList.add('hidden');
+    $('#view-login').classList.remove('hidden');
+    $('#userbox').classList.add('hidden');
+  }
+
+  function showApp() {
+    $('#view-login').classList.add('hidden');
+    $('#view-app').classList.remove('hidden');
+    $('#userbox').classList.remove('hidden');
+    renderUserBox();
+    loadRecords();
+  }
+
+  function renderRecords() {
+    var tbody = $('tbody');
+    tbody.textContent = '';
+    if (!state.records || state.records.length === 0) {
+      var tr0 = document.createElement('tr');
+      var td0 = document.createElement('td');
+      td0.colSpan = 5;
+      td0.className = 'muted';
+      td0.textContent = '还没有子域名，先在上面创建一个吧。';
+      tr0.appendChild(td0);
+      tbody.appendChild(tr0);
+      return;
+    }
+    state.records.forEach(function (r) {
+      var tr = document.createElement('tr');
+
+      var tdName = document.createElement('td');
+      var code = document.createElement('code');
+      code.textContent = r.subdomain + '.' + state.rootDomain;
+      tdName.appendChild(code);
+
+      var tdType = document.createElement('td');
+      tdType.textContent = r.type;
+
+      var tdVal = document.createElement('td');
+      var vcode = document.createElement('code');
+      vcode.textContent = r.value;
+      tdVal.appendChild(vcode);
+
+      var tdTime = document.createElement('td');
+      tdTime.className = 'muted small';
+      tdTime.textContent = (r.created_at || '').slice(0, 10);
+
+      var tdOps = document.createElement('td');
+      var del = document.createElement('button');
+      del.type = 'button';
+      del.className = 'danger';
+      del.textContent = '删除';
+      del.addEventListener('click', function () { removeRecord(r); });
+      tdOps.appendChild(del);
+
+      tr.appendChild(tdName);
+      tr.appendChild(tdType);
+      tr.appendChild(tdVal);
+      tr.appendChild(tdTime);
+      tr.appendChild(tdOps);
+      tbody.appendChild(tr);
+    });
+  }
+
+  function loadRecords() {
+    api('/api/records').then(function (data) {
+      state.records = data.records;
+      state.rootDomain = data.rootDomain;
+      $('#quota').textContent = state.records.length + ' / ' + data.maxRecords;
+      renderRecords();
+    }).catch(function (e) {
+      showMsg($('#records-msg'), e.message, false);
+    });
+  }
+
+  function removeRecord(r) {
+    if (!window.confirm('确定删除 ' + r.subdomain + '.' + state.rootDomain + ' 吗？')) return;
+    api('/api/records/' + r.id, { method: 'DELETE' }).then(function () {
+      loadRecords();
+    }).catch(function (e) {
+      showMsg($('#records-msg'), e.message, false);
+    });
+  }
+
+  // ---- 事件绑定 ----
+  $('#login-form').addEventListener('submit', function (ev) {
+    ev.preventDefault();
+    var msg = $('#login-msg');
+    api('/api/login', {
+      method: 'POST',
+      body: { username: $('#login-username').value, password: $('#login-password').value }
+    }).then(function (data) {
+      state.user = data.username;
+      showApp();
+    }).catch(function (e) {
+      showMsg(msg, e.message, false);
+    });
+  });
+
+  $('#create-form').addEventListener('submit', function (ev) {
+    ev.preventDefault();
+    var msg = $('#create-msg');
+    api('/api/records', {
+      method: 'POST',
+      body: {
+        subdomain: $('#create-sub').value,
+        type: $('#create-type').value,
+        value: $('#create-value').value
+      }
+    }).then(function (data) {
+      showMsg(msg, '成功：' + data.fqdn + ' → ' + data.type + ' ' + data.value +
+        '（' + (data.updated ? '已更新' : '已创建') + '），生效一般需 1-5 分钟。', true);
+      $('#create-sub').value = '';
+      $('#create-value').value = '';
+      loadRecords();
+    }).catch(function (e) {
+      showMsg(msg, e.message, false);
+    });
+  });
+
+  $('#create-type').addEventListener('change', function () {
+    var t = this.value;
+    var label = $('#value-label');
+    var input = $('#create-value');
+    if (t === 'A') { label.firstChild.textContent = '目标 IPv4 '; input.placeholder = '例如 1.2.3.4'; }
+    else if (t === 'AAAA') { label.firstChild.textContent = '目标 IPv6 '; input.placeholder = '例如 2001:db8::1'; }
+    else { label.firstChild.textContent = '目标域名（CNAME） '; input.placeholder = '例如 example.com'; }
+  });
+
+  $('#create-sub').addEventListener('input', function () {
+    var v = (this.value || 'xxx').toLowerCase();
+    $('#create-fqdn').textContent = v + '.' + state.rootDomain;
+  });
+
+  // ---- 初始化 ----
+  api('/api/me').then(function (data) {
+    state.user = data.username;
+    state.rootDomain = data.rootDomain;
+    showApp();
+  }).catch(function () {
+    showLogin();
+  });
+})();
+</script>
+</body>
+</html>
