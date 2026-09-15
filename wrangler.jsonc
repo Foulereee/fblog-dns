@@ -5,8 +5,14 @@
 	"compatibility_date": "2024-12-01",
 	"assets": {
 		"directory": "./public",
-		"binding": "ASSETS"
+		"binding": "ASSETS",
+		"run_worker_first": true
 	},
+	"custom_domains": [
+		{
+			"pattern": "dns.fblog.cyou"
+		}
+	],
 	"vars": {
 		"ROOT_DOMAIN": "fblog.cyou"
 	},
