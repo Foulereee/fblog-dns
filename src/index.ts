@@ -43,6 +43,7 @@ export interface Env {
   DB: D1Database;
   ASSETS: Fetcher;
   EMAIL?: EmailBinding;
+  RESEND_API_KEY?: string;
   CF_API_TOKEN: string;
   CF_ZONE_ID: string;
   ADMIN_PASSWORD: string;
