@@ -37,7 +37,7 @@ import {
 } from './auth';
 import { validateSubdomain, validateValue } from './validate';
 import { CfDns } from './cloudflare';
-import { EmailBinding, sendCodeEmail, sendExpiryReminder } from './email';
+import { EmailBinding, sendCodeEmail, sendExpiryReminder, sendResetCodeEmail } from './email';
 
 export interface Env {
   DB: D1Database;
@@ -208,19 +208,26 @@ async function handleLogin(request: Request, env: Env): Promise<Response> {
   });
 }
 
-/** 注册第一步：邮箱 + 密码 → 发送验证码 */
+/** 注册第一步：用户名 + 邮箱 + 密码 → 发送验证码 */
 async function handleRegister(request: Request, env: Env): Promise<Response> {
   if (rateLimited('register:' + clientIp(request), 20, 3600_000)) {
     return json({ error: '操作过于频繁，请稍后再试' }, 429);
   }
   const body = await readJson(request);
+  const username = String(body?.username ?? '').trim().toLowerCase();
   const email = String(body?.email ?? '').trim().toLowerCase();
   const password = String(body?.password ?? '');
+  if (!/^[a-z0-9_]{3,32}$/.test(username)) {
+    return json({ error: '用户名需为 3-32 位小写字母、数字或下划线' }, 400);
+  }
   if (!EMAIL_RE.test(email)) return json({ error: '邮箱格式不正确' }, 400);
   if (password.length < 8) return json({ error: '密码至少 8 位' }, 400);
 
-  const existing = await env.DB.prepare('SELECT id FROM users WHERE email = ?1').bind(email).first();
-  if (existing) return json({ error: '该邮箱已注册，请直接登录' }, 409);
+  // 防重复注册：用户名与邮箱都唯一
+  const dupName = await env.DB.prepare('SELECT id FROM users WHERE username = ?1').bind(username).first();
+  if (dupName) return json({ error: '该用户名已被占用，请换一个' }, 409);
+  const dupEmail = await env.DB.prepare('SELECT id FROM users WHERE email = ?1').bind(email).first();
+  if (dupEmail) return json({ error: '该邮箱已注册，请直接登录或找回密码' }, 409);
 
   const row = await env.DB.prepare('SELECT sent_count, last_sent_at FROM reg_codes WHERE email = ?1')
     .bind(email)
@@ -240,23 +247,22 @@ async function handleRegister(request: Request, env: Env): Promise<Response> {
 
   if (row) {
     await env.DB.prepare(
-      `UPDATE reg_codes SET code_hash = ?1, pass_hash = ?2, pass_salt = ?3, expires_at = ?4,
-       attempts = 0, sent_count = sent_count + 1, last_sent_at = ?5 WHERE email = ?6`,
+      `UPDATE reg_codes SET code_hash = ?1, pass_hash = ?2, pass_salt = ?3, username = ?4, expires_at = ?5,
+       attempts = 0, sent_count = sent_count + 1, last_sent_at = ?6 WHERE email = ?7`,
     )
-      .bind(codeHash, hash, salt, expiresAt, now, email)
+      .bind(codeHash, hash, salt, username, expiresAt, now, email)
       .run();
   } else {
     await env.DB.prepare(
-      `INSERT INTO reg_codes (email, code_hash, pass_hash, pass_salt, expires_at, sent_count, last_sent_at)
-       VALUES (?1, ?2, ?3, ?4, ?5, 1, ?6)`,
+      `INSERT INTO reg_codes (email, code_hash, pass_hash, pass_salt, username, expires_at, sent_count, last_sent_at)
+       VALUES (?1, ?2, ?3, ?4, ?5, ?6, 1, ?7)`,
     )
-      .bind(email, codeHash, hash, salt, expiresAt, now)
+      .bind(email, codeHash, hash, salt, username, expiresAt, now)
       .run();
   }
 
   const sent = await sendCodeEmail(env, email, code);
   if (!sent.delivered) {
-    // 邮件未真正发出（邮件服务未接入 / 发件域名未验证）：清理临时代码，避免用户白等
     await env.DB.prepare('DELETE FROM reg_codes WHERE email = ?1').bind(email).run();
     return json(
       { error: '验证码发送失败：邮件服务尚未接入或发件域名未验证，请联系管理员' },
@@ -275,10 +281,10 @@ async function handleRegisterVerify(request: Request, env: Env): Promise<Respons
   if (!/^\d{6}$/.test(code)) return json({ error: '验证码格式不正确' }, 400);
 
   const row = await env.DB.prepare(
-    'SELECT code_hash, pass_hash, pass_salt, expires_at, attempts FROM reg_codes WHERE email = ?1',
+    'SELECT code_hash, pass_hash, pass_salt, username, expires_at, attempts FROM reg_codes WHERE email = ?1',
   )
     .bind(email)
-    .first<{ code_hash: string; pass_hash: string; pass_salt: string; expires_at: number; attempts: number }>();
+    .first<{ code_hash: string; pass_hash: string; pass_salt: string; username: string | null; expires_at: number; attempts: number }>();
   if (!row) return json({ error: '请先获取验证码' }, 400);
   if (!row.pass_hash || !row.pass_salt) return json({ error: '注册信息不完整，请重新获取验证码' }, 400);
   if (row.expires_at < Date.now()) {
@@ -296,20 +302,23 @@ async function handleRegisterVerify(request: Request, env: Env): Promise<Respons
     return json({ error: `验证码错误（还可尝试 ${Math.max(0, CODE_MAX_ATTEMPTS - row.attempts - 1)} 次）` }, 400);
   }
 
-  // 用户名唯一化
-  let username = usernameFromEmail(email);
-  let candidate = username;
-  let suffix = 1;
-  while (await env.DB.prepare('SELECT id FROM users WHERE username = ?1').bind(candidate).first()) {
-    candidate = username.slice(0, Math.max(1, 32 - String(suffix).length)) + suffix;
-    suffix += 1;
+  // 用户名唯一性二次校验（防止两步之间被抢注）
+  const username = (row.username ?? '').trim().toLowerCase() || usernameFromEmail(email);
+  if (!/^[a-z0-9_]{3,32}$/.test(username)) {
+    await env.DB.prepare('DELETE FROM reg_codes WHERE email = ?1').bind(email).run();
+    return json({ error: '用户名不合法，请重新注册' }, 400);
+  }
+  const dup = await env.DB.prepare('SELECT id FROM users WHERE username = ?1 OR email = ?2').bind(username, email).first();
+  if (dup) {
+    await env.DB.prepare('DELETE FROM reg_codes WHERE email = ?1').bind(email).run();
+    return json({ error: '该用户名或邮箱已被占用，请重新注册' }, 409);
   }
 
   await env.DB.prepare(
     `INSERT INTO users (username, email, pass_hash, pass_salt, email_verified, status, created_via)
      VALUES (?1, ?2, ?3, ?4, 1, 'active', 'register')`,
   )
-    .bind(candidate, email, row.pass_hash, row.pass_salt)
+    .bind(username, email, row.pass_hash, row.pass_salt)
     .run();
   await env.DB.prepare('DELETE FROM reg_codes WHERE email = ?1').bind(email).run();
 
@@ -322,6 +331,105 @@ async function handleRegisterVerify(request: Request, env: Env): Promise<Respons
     exp: Date.now() + SESSION_MAX_AGE_SECONDS * 1000,
   });
   return json({ ok: true, username: user.username }, 200, {
+    'Set-Cookie': setSessionCookie(token, SESSION_MAX_AGE_SECONDS),
+  });
+}
+
+/** 找回密码第一步：邮箱 → 发送验证码 */
+async function handleForgotPassword(request: Request, env: Env): Promise<Response> {
+  if (rateLimited('forgot:' + clientIp(request), 10, 3600_000)) {
+    return json({ error: '操作过于频繁，请稍后再试' }, 429);
+  }
+  const body = await readJson(request);
+  const email = String(body?.email ?? '').trim().toLowerCase();
+  if (!EMAIL_RE.test(email)) return json({ error: '邮箱格式不正确' }, 400);
+
+  const user = await env.DB.prepare('SELECT id FROM users WHERE email = ?1 AND email_verified = 1').bind(email).first();
+  // 为防邮箱枚举，即使邮箱不存在也返回相同提示
+  if (!user) return json({ ok: true, message: '若该邮箱已注册，验证码将发送至你的邮箱' });
+
+  const row = await env.DB.prepare('SELECT sent_count, last_sent_at FROM reset_codes WHERE email = ?1')
+    .bind(email)
+    .first<{ sent_count: number; last_sent_at: number | null }>();
+  const now = Date.now();
+  if (row && row.last_sent_at && now - row.last_sent_at < CODE_RESEND_MS) {
+    return json({ error: '发送过于频繁，请 60 秒后再试' }, 429);
+  }
+  if (row && row.sent_count >= CODE_DAILY_LIMIT) {
+    return json({ error: '今日验证码发送次数已达上限，请明天再试' }, 429);
+  }
+
+  const code = genEmailCode();
+  const codeHash = await hashEmailCode(code, email);
+  const expiresAt = now + CODE_TTL_MS;
+  if (row) {
+    await env.DB.prepare(
+      `UPDATE reset_codes SET code_hash = ?1, expires_at = ?2, attempts = 0, sent_count = sent_count + 1, last_sent_at = ?3 WHERE email = ?4`,
+    )
+      .bind(codeHash, expiresAt, now, email)
+      .run();
+  } else {
+    await env.DB.prepare(
+      `INSERT INTO reset_codes (email, code_hash, expires_at, sent_count, last_sent_at) VALUES (?1, ?2, ?3, 1, ?4)`,
+    )
+      .bind(email, codeHash, expiresAt, now)
+      .run();
+  }
+
+  const sent = await sendResetCodeEmail(env, email, code);
+  if (!sent.delivered) {
+    await env.DB.prepare('DELETE FROM reset_codes WHERE email = ?1').bind(email).run();
+    return json({ error: '验证码发送失败，请联系管理员' }, 502);
+  }
+  return json({ ok: true, message: '验证码已发送到你的邮箱', email });
+}
+
+/** 找回密码第二步：验证码 + 新密码 → 重置并自动登录 */
+async function handleResetPassword(request: Request, env: Env): Promise<Response> {
+  const body = await readJson(request);
+  const email = String(body?.email ?? '').trim().toLowerCase();
+  const code = String(body?.code ?? '').trim();
+  const newPassword = String(body?.password ?? '');
+  if (!EMAIL_RE.test(email)) return json({ error: '邮箱格式不正确' }, 400);
+  if (!/^\d{6}$/.test(code)) return json({ error: '验证码格式不正确' }, 400);
+  if (newPassword.length < 8) return json({ error: '密码至少 8 位' }, 400);
+
+  const row = await env.DB.prepare(
+    'SELECT code_hash, expires_at, attempts FROM reset_codes WHERE email = ?1',
+  )
+    .bind(email)
+    .first<{ code_hash: string; expires_at: number; attempts: number }>();
+  if (!row) return json({ error: '请先获取验证码' }, 400);
+  if (row.expires_at < Date.now()) {
+    await env.DB.prepare('DELETE FROM reset_codes WHERE email = ?1').bind(email).run();
+    return json({ error: '验证码已过期，请重新获取' }, 400);
+  }
+  if (row.attempts >= CODE_MAX_ATTEMPTS) {
+    await env.DB.prepare('DELETE FROM reset_codes WHERE email = ?1').bind(email).run();
+    return json({ error: '尝试次数过多，请重新获取验证码' }, 429);
+  }
+  const expect = await hashEmailCode(code, email);
+  if (expect !== row.code_hash) {
+    await env.DB.prepare('UPDATE reset_codes SET attempts = attempts + 1 WHERE email = ?1').bind(email).run();
+    return json({ error: `验证码错误（还可尝试 ${Math.max(0, CODE_MAX_ATTEMPTS - row.attempts - 1)} 次）` }, 400);
+  }
+
+  const user = await env.DB.prepare('SELECT id FROM users WHERE email = ?1').bind(email).first<{ id: number }>();
+  if (!user) {
+    await env.DB.prepare('DELETE FROM reset_codes WHERE email = ?1').bind(email).run();
+    return json({ error: '账号不存在' }, 404);
+  }
+  const { hash, salt } = await hashPassword(newPassword);
+  await env.DB.prepare('UPDATE users SET pass_hash = ?1, pass_salt = ?2 WHERE id = ?3')
+    .bind(hash, salt, user.id)
+    .run();
+  await env.DB.prepare('DELETE FROM reset_codes WHERE email = ?1').bind(email).run();
+
+  const token = await createSessionToken(env.SESSION_SECRET, {
+    uid: user.id,
+    exp: Date.now() + SESSION_MAX_AGE_SECONDS * 1000,
+  });
+  return json({ ok: true, message: '密码已重置，已自动登录' }, 200, {
     'Set-Cookie': setSessionCookie(token, SESSION_MAX_AGE_SECONDS),
   });
 }
@@ -757,6 +865,12 @@ export default {
           break;
         case '/api/register/verify':
           if (request.method === 'POST') return await handleRegisterVerify(request, env);
+          break;
+        case '/api/password/forgot':
+          if (request.method === 'POST') return await handleForgotPassword(request, env);
+          break;
+        case '/api/password/reset':
+          if (request.method === 'POST') return await handleResetPassword(request, env);
           break;
         case '/api/records':
           if (request.method === 'GET') return await handleListRecords(request, env);

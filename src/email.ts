@@ -105,6 +105,24 @@ export async function sendCodeEmail(
   return sendMail(env, { to, subject, html, text });
 }
 
+/** 发送找回密码验证码 */
+export async function sendResetCodeEmail(
+  env: EmailEnv,
+  to: string,
+  code: string,
+): Promise<{ delivered: boolean; provider: string }> {
+  const subject = `fblog.cyou 找回密码 ${code}`;
+  const html =
+    '<div style="font-family:system-ui,sans-serif;max-width:480px;margin:0 auto;padding:24px">' +
+    '<p style="color:#334155">你好，</p>' +
+    `<p style="color:#334155">你正在重置 ${esc(PLATFORM_NAME)} 的账号密码，验证码为：</p>` +
+    `<p style="font-size:28px;font-weight:700;letter-spacing:6px;color:#0284c7;background:#f0f9ff;border:1px dashed #7dd3fc;border-radius:8px;padding:12px 16px;text-align:center">${esc(code)}</p>` +
+    '<p style="color:#64748b;font-size:13px">验证码 10 分钟内有效。若非本人操作，请忽略这封邮件。</p>' +
+    '</div>';
+  const text = `你正在重置 ${PLATFORM_NAME} 的账号密码，验证码：${code}（10 分钟内有效）。若非本人操作请忽略。`;
+  return sendMail(env, { to, subject, html, text });
+}
+
 /** 到期提醒邮件（到期前 N 天） */
 export async function sendExpiryReminder(
   env: EmailEnv,

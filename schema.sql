@@ -13,12 +13,23 @@ CREATE TABLE IF NOT EXISTS users (
   created_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ', 'now'))
 );
 
--- 注册验证码（邮箱注册流程）
+-- 注册验证码（邮箱注册流程，含用户自定义用户名）
 CREATE TABLE IF NOT EXISTS reg_codes (
   email TEXT PRIMARY KEY,
   code_hash TEXT NOT NULL,
   pass_hash TEXT,
   pass_salt TEXT,
+  username TEXT,
+  expires_at INTEGER NOT NULL,
+  attempts INTEGER NOT NULL DEFAULT 0,
+  sent_count INTEGER NOT NULL DEFAULT 0,
+  last_sent_at INTEGER
+);
+
+-- 找回密码验证码
+CREATE TABLE IF NOT EXISTS reset_codes (
+  email TEXT PRIMARY KEY,
+  code_hash TEXT NOT NULL,
   expires_at INTEGER NOT NULL,
   attempts INTEGER NOT NULL DEFAULT 0,
   sent_count INTEGER NOT NULL DEFAULT 0,

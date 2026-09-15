@@ -242,13 +242,14 @@
     <div class="auth-card">
       <form id="login-form">
         <label>用户名 / 邮箱</label>
-        <input id="login-id" autocomplete="username" required>
+        <input id="login-id" autocomplete="username" placeholder="用户名或邮箱" required>
         <label>密码</label>
         <input id="login-password" type="password" autocomplete="current-password" required>
         <div id="login-msg" class="msg"></div>
         <button class="btn btn-primary" style="width:100%" type="submit">登录</button>
       </form>
-      <div class="switch-line">还没有账号？<a data-goto="register">免费注册</a> · <a data-goto="landing">返回首页</a></div>
+      <div class="switch-line" style="display:flex;justify-content:space-between"><a data-goto="forgot">忘记密码？</a><a data-goto="landing">返回首页</a></div>
+      <div class="switch-line">还没有账号？<a data-goto="register">免费注册</a></div>
     </div>
   </div>
 </div>
@@ -260,6 +261,8 @@
     <div class="subtitle">使用邮箱接收验证码完成注册</div>
     <div class="auth-card">
       <form id="register-form">
+        <label>用户名 <span class="small muted">（3-32 位小写字母/数字/下划线）</span></label>
+        <input id="reg-username" autocomplete="username" placeholder="例如 alice" required>
         <label>邮箱</label>
         <input id="reg-email" type="email" autocomplete="email" placeholder="you@example.com" required>
         <label>密码 <span class="small muted">（至少 8 位）</span></label>
@@ -277,6 +280,34 @@
         <div class="switch-line"><a id="reg-resend" style="cursor:pointer">重发验证码</a> · <a data-goto="login">已有账号？登录</a></div>
       </form>
       <div class="switch-line" id="reg-switch2"><a data-goto="login">已有账号？登录</a> · <a data-goto="landing">返回首页</a></div>
+    </div>
+  </div>
+</div>
+
+<!-- ============ 找回密码（两步：邮箱 → 验证码+新密码） ============ -->
+<div id="view-forgot" class="hidden">
+  <div class="panel">
+    <div class="title">找回密码</div>
+    <div class="subtitle">通过注册邮箱重置密码</div>
+    <div class="auth-card">
+      <form id="forgot-form">
+        <label>注册邮箱</label>
+        <input id="forgot-email" type="email" autocomplete="email" placeholder="you@example.com" required>
+        <div id="forgot-msg" class="msg"></div>
+        <button class="btn btn-primary" style="width:100%" type="submit" id="forgot-send-btn">发送验证码</button>
+      </form>
+      <form id="reset-form" class="hidden">
+        <label>邮箱</label>
+        <input id="reset-email" disabled>
+        <label>6 位验证码</label>
+        <input id="reset-code" inputmode="numeric" maxlength="6" placeholder="123456" required>
+        <label>新密码 <span class="small muted">（至少 8 位）</span></label>
+        <input id="reset-password" type="password" autocomplete="new-password" required>
+        <div id="reset-msg" class="msg"></div>
+        <button class="btn btn-primary" style="width:100%" type="submit" id="reset-btn">重置密码并登录</button>
+        <div class="switch-line"><a id="forgot-resend" style="cursor:pointer">重发验证码</a> · <a data-goto="login">返回登录</a></div>
+      </form>
+      <div class="switch-line" id="forgot-switch2"><a data-goto="login">返回登录</a> · <a data-goto="landing">返回首页</a></div>
     </div>
   </div>
 </div>
@@ -358,7 +389,7 @@
   }
 
   function showView(name) {
-    ['landing', 'login', 'register', 'dash'].forEach(function (v) {
+    ['landing', 'login', 'register', 'forgot', 'dash'].forEach(function (v) {
       $('#view-' + v).classList.toggle('hidden', v !== name);
     });
     window.scrollTo(0, 0);
@@ -426,7 +457,7 @@
     ev.preventDefault();
     var btn = $('#reg-send-btn');
     btn.disabled = true;
-    api('/api/register', { method: 'POST', body: { email: $('#reg-email').value, password: $('#reg-password').value } })
+    api('/api/register', { method: 'POST', body: { username: $('#reg-username').value, email: $('#reg-email').value, password: $('#reg-password').value } })
       .then(function (data) {
         $('#ver-email').value = data.email || $('#reg-email').value;
         $('#register-form').classList.add('hidden');
@@ -453,9 +484,46 @@
   });
 
   $('#reg-resend').addEventListener('click', function () {
-    api('/api/register', { method: 'POST', body: { email: $('#ver-email').value, password: $('#reg-password').value } })
+    api('/api/register', { method: 'POST', body: { username: $('#reg-username').value, email: $('#ver-email').value, password: $('#reg-password').value } })
       .then(function () { showMsg($('#ver-msg'), '验证码已重新发送，请查收', 'info'); })
       .catch(function (e) { showMsg($('#ver-msg'), e.message, 'err'); });
+  });
+
+  // ---------- 找回密码 ----------
+  $('#forgot-form').addEventListener('submit', function (ev) {
+    ev.preventDefault();
+    var btn = $('#forgot-send-btn');
+    btn.disabled = true;
+    api('/api/password/forgot', { method: 'POST', body: { email: $('#forgot-email').value } })
+      .then(function (data) {
+        $('#reset-email').value = data.email || $('#forgot-email').value;
+        $('#forgot-form').classList.add('hidden');
+        $('#reset-form').classList.remove('hidden');
+        $('#forgot-switch2').classList.add('hidden');
+        showMsg($('#reset-msg'), '验证码已发送，请查收邮箱（10 分钟内有效）', 'info');
+      })
+      .catch(function (e) { showMsg($('#forgot-msg'), e.message, 'err'); })
+      .finally(function () { btn.disabled = false; });
+  });
+
+  $('#reset-form').addEventListener('submit', function (ev) {
+    ev.preventDefault();
+    var btn = $('#reset-btn');
+    btn.disabled = true;
+    api('/api/password/reset', { method: 'POST', body: { email: $('#reset-email').value, code: $('#reset-code').value, password: $('#reset-password').value } })
+      .then(function (data) {
+        state.user = null;
+        showView('login');
+        toast('密码已重置，请用新密码登录', 'ok');
+      })
+      .catch(function (e) { showMsg($('#reset-msg'), e.message, 'err'); })
+      .finally(function () { btn.disabled = false; });
+  });
+
+  $('#forgot-resend').addEventListener('click', function () {
+    api('/api/password/forgot', { method: 'POST', body: { email: $('#reset-email').value } })
+      .then(function () { showMsg($('#reset-msg'), '验证码已重新发送，请查收', 'info'); })
+      .catch(function (e) { showMsg($('#reset-msg'), e.message, 'err'); });
   });
 
   // ---------- 仪表盘数据 ----------
@@ -714,6 +782,12 @@
         $('#register-form').classList.remove('hidden');
         $('#verify-form').classList.add('hidden');
         $('#reg-switch2').classList.remove('hidden');
+      }
+      if (v === 'forgot') {
+        showMsg($('#forgot-msg'), '', '');
+        $('#forgot-form').classList.remove('hidden');
+        $('#reset-form').classList.add('hidden');
+        $('#forgot-switch2').classList.remove('hidden');
       }
       showView(v);
     }
