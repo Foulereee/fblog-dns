@@ -1,14 +1,13 @@
 # 复制本文件为 .dev.vars（本地 wrangler dev 时读取，不要提交到 git）
 # 线上环境的这些值用: npx wrangler secret put <名字> 设置
 
-# Cloudflare API Token：My Profile -> API Tokens -> Create Token
-# 模板选 "Edit zone DNS"，Zone Resources 只授权 fblog.cyou 这一个 zone
-CF_API_TOKEN=粘贴你的API_Token
+# Cloudflare API Token（DNS）：My Profile -> API Tokens -> 模板 "Edit zone DNS"，只授权 fblog.cyou
+CF_API_TOKEN=粘贴你的DNS_API_Token
 
 # Zone ID：Cloudflare 控制台 fblog.cyou 的 Overview 页面右侧
 CF_ZONE_ID=粘贴你的Zone_ID
 
-# 管理员口令：用 Bearer 方式调用 /api/admin/users 创建用户时使用
+# 管理员口令：用 Bearer 方式调用 /api/admin/users、/api/admin/maintenance 时使用
 ADMIN_PASSWORD=设置一个长随机口令
 
 # 会话签名密钥：生成方式 openssl rand -hex 32

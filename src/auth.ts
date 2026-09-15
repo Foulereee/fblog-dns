@@ -121,3 +121,33 @@ export function readCookie(header: string | null): string | null {
   }
   return null;
 }
+
+// ---------- 邮箱注册相关 ----------
+
+export const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/;
+
+/** 生成 6 位数字验证码 */
+export function genEmailCode(): string {
+  const n = crypto.getRandomValues(new Uint32Array(1))[0] % 1_000_000;
+  return String(n).padStart(6, '0');
+}
+
+/** 验证码哈希（SHA-256 hex），存库不存明文 */
+export async function hashEmailCode(code: string, email: string): Promise<string> {
+  const buf = await crypto.subtle.digest('SHA-256', enc.encode(`${email}:${code}`));
+  return Array.from(new Uint8Array(buf))
+    .map((b) => b.toString(16).padStart(2, '0'))
+    .join('');
+}
+
+/**
+ * 从邮箱生成默认用户名：取 @ 前缀，转为小写字母/数字/下划线，
+ * 最短 3 位；冲突检查由调用方保证唯一（追加序号）。
+ */
+export function usernameFromEmail(email: string): string {
+  let base = email.split('@')[0].toLowerCase();
+  base = base.replace(/[^a-z0-9_]/g, '_');
+  if (base.length < 3) base = base + '_dns';
+  if (base.length > 32) base = base.slice(0, 32);
+  return base;
+}

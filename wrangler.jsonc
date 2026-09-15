@@ -13,6 +13,17 @@
 			"pattern": "dns.fblog.cyou"
 		}
 	],
+	// Cloudflare Email Service：邮箱注册验证码 / 到期提醒
+	// 需要在 Cloudflare 控制台把发件域名（如 mail.fblog.cyou）接入 Email Service 并验证
+	"send_email": [
+		{
+			"name": "EMAIL"
+		}
+	],
+	// 定时任务：每日 UTC 03:00 清理到期未续期的子域名
+	"triggers": {
+		"crons": ["0 3 * * *"]
+	},
 	"vars": {
 		"ROOT_DOMAIN": "fblog.cyou"
 	},
