@@ -49,7 +49,13 @@ async function sendViaResend(env: EmailEnv, msg: MailMsg): Promise<boolean> {
       Authorization: `Bearer ${key}`,
       'Content-Type': 'application/json',
     },
-    body: JSON.stringify({ from: SEND_FROM, to: msg.to, subject: msg.subject, html: msg.html, text: msg.text }),
+    body: JSON.stringify({
+      from: `${PLATFORM_NAME} <${SEND_FROM}>`,
+      to: msg.to,
+      subject: msg.subject,
+      html: msg.html,
+      text: msg.text,
+    }),
   });
   const data = (await res.json().catch(() => null)) as { id?: string; message?: string } | null;
   if (!res.ok) {
@@ -87,15 +93,15 @@ export async function sendCodeEmail(
   to: string,
   code: string,
 ): Promise<{ delivered: boolean; provider: string }> {
-  const subject = `【${PLATFORM_NAME}】你的注册验证码：${code}`;
+  const subject = `fblog.cyou 邮箱验证 ${code}`;
   const html =
     '<div style="font-family:system-ui,sans-serif;max-width:480px;margin:0 auto;padding:24px">' +
-    '<h2 style="color:#0f172a">验证你的邮箱</h2>' +
-    `<p style="color:#334155">你在 ${esc(PLATFORM_NAME)} 提交了注册请求，验证码为：</p>` +
+    '<p style="color:#334155">你好，</p>' +
+    `<p style="color:#334155">你正在 ${esc(PLATFORM_NAME)} 验证邮箱，验证码为：</p>` +
     `<p style="font-size:28px;font-weight:700;letter-spacing:6px;color:#0284c7;background:#f0f9ff;border:1px dashed #7dd3fc;border-radius:8px;padding:12px 16px;text-align:center">${esc(code)}</p>` +
-    '<p style="color:#64748b;font-size:13px">验证码 10 分钟内有效，请勿泄露给他人。若非本人操作请忽略此邮件。</p>' +
+    '<p style="color:#64748b;font-size:13px">验证码 10 分钟内有效。若非本人操作，请忽略这封邮件。</p>' +
     '</div>';
-  const text = `你的 ${PLATFORM_NAME} 注册验证码是：${code}（10 分钟内有效）`;
+  const text = `你正在 ${PLATFORM_NAME} 验证邮箱，验证码：${code}（10 分钟内有效）。若非本人操作请忽略。`;
   return sendMail(env, { to, subject, html, text });
 }
 
