@@ -235,7 +235,15 @@ async function handleRegister(request: Request, env: Env): Promise<Response> {
       .run();
   }
 
-  await sendCodeEmail(env, email, code);
+  const sent = await sendCodeEmail(env, email, code);
+  if (!sent.delivered) {
+    // 邮件未真正发出（邮件服务未接入 / 发件域名未验证）：清理临时代码，避免用户白等
+    await env.DB.prepare('DELETE FROM reg_codes WHERE email = ?1').bind(email).run();
+    return json(
+      { error: '验证码发送失败：邮件服务尚未接入或发件域名未验证，请联系管理员' },
+      502,
+    );
+  }
   return json({ ok: true, message: '验证码已发送到你的邮箱', email });
 }
 
