@@ -34,8 +34,25 @@ jobs:
       - name: Type check
         run: npm run typecheck
 
+      # 每次运行前用长效 refresh token 换新鲜 access token，
+      # 避免 CI 里放一个会过期的 OAuth access token（约 1 小时寿命）。
+      # 注意：CLOUDFLARE_REFRESH_TOKEN 是高权限凭据，仅应放在私有仓库 Secrets 中。
+      - name: Refresh Cloudflare OAuth token
+        id: cfref
+        run: |
+          resp=$(curl -sS -X POST 'https://dash.cloudflare.com/oauth2/token' \
+            -H 'Content-Type: application/x-www-form-urlencoded' \
+            --data-urlencode 'grant_type=refresh_token' \
+            --data-urlencode "refresh_token=${REFRESH_TOKEN}" \
+            --data-urlencode 'client_id=54d11594-84e4-41aa-b438-e81b8fa78ee7')
+          token=$(printf '%s' "$resp" | jq -r '.access_token // empty')
+          if [ -z "$token" ]; then echo "::error::OAuth refresh failed: $resp"; exit 1; fi
+          echo "cf_token=${token}" >> "$GITHUB_OUTPUT"
+        env:
+          REFRESH_TOKEN: ${{ secrets.CLOUDFLARE_REFRESH_TOKEN }}
+
       - name: Deploy to Cloudflare Workers
         run: npx wrangler deploy
         env:
-          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_API_TOKEN: ${{ steps.cfref.outputs.cf_token }}
           CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
