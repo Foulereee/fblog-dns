@@ -34,6 +34,8 @@ CREATE TABLE IF NOT EXISTS records (
   cf_record_id TEXT,
   expires_at INTEGER NOT NULL,
   renewed_at INTEGER,
+  ddns_token TEXT,
+  reminder_level INTEGER NOT NULL DEFAULT 0,
   created_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ', 'now')),
   updated_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ', 'now')),
   UNIQUE (subdomain, type)

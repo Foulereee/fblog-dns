@@ -37,7 +37,7 @@ import {
 } from './auth';
 import { validateSubdomain, validateValue } from './validate';
 import { CfDns } from './cloudflare';
-import { EmailBinding, sendCodeEmail } from './email';
+import { EmailBinding, sendCodeEmail, sendExpiryReminder } from './email';
 
 export interface Env {
   DB: D1Database;
@@ -113,6 +113,24 @@ function escapeHtml(s: string): string {
     .replace(/</g, '&lt;')
     .replace(/>/g, '&gt;')
     .replace(/"/g, '&quot;');
+}
+
+/** 生成 32 位随机 hex 令牌（DDNS 更新用） */
+function genToken(): string {
+  const b = crypto.getRandomValues(new Uint8Array(16));
+  return Array.from(b)
+    .map((x) => x.toString(16).padStart(2, '0'))
+    .join('');
+}
+
+/** dyndns2 风格纯文本响应（ddclient/路由器可解析） */
+function ddnsText(body: string): Response {
+  return new Response(body + '\n', {
+    headers: {
+      'Content-Type': 'text/plain; charset=utf-8',
+      'Cache-Control': 'no-store',
+    },
+  });
 }
 
 function ensureEnv(env: Env): void {
@@ -332,12 +350,13 @@ interface RecordRow {
   renewed_at: number | null;
   created_at: string;
   updated_at: string;
+  ddns_token: string | null;
 }
 
 async function handleListRecords(request: Request, env: Env): Promise<Response> {
   const user = await requireUser(request, env);
   const res = await env.DB.prepare(
-    `SELECT id, subdomain, type, value, expires_at, renewed_at, created_at, updated_at
+    `SELECT id, subdomain, type, value, expires_at, renewed_at, created_at, updated_at, ddns_token
      FROM records WHERE user_id = ?1 ORDER BY created_at DESC`,
   )
     .bind(user.id)
@@ -356,6 +375,7 @@ async function handleListRecords(request: Request, env: Env): Promise<Response> 
       days_remaining: Math.max(0, Math.floor(remaining / 86_400_000)),
       renewable: remaining > 0 && remaining <= RENEW_WINDOW_MS,
       expired: remaining <= 0,
+      ddns_token: r.ddns_token ?? '',
     };
   });
   return json({ records, rootDomain: env.ROOT_DOMAIN, maxSubdomains: MAX_SUBDOMAINS_PER_USER });
@@ -475,13 +495,14 @@ async function handleCreateRecord(request: Request, env: Env): Promise<Response>
 
   const rec = await withCf('DNS 写入', () => cf.create({ type, name: fqdn, content: value }));
   const expiresAt = Date.now() + RECORD_LIFETIME_MS;
+  const ddnsToken = genToken();
   await env.DB.prepare(
-    `INSERT INTO records (user_id, subdomain, type, value, cf_record_id, expires_at)
-     VALUES (?1, ?2, ?3, ?4, ?5, ?6)`,
+    `INSERT INTO records (user_id, subdomain, type, value, cf_record_id, expires_at, ddns_token)
+     VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7)`,
   )
-    .bind(user.id, sub, type, value, rec.id, expiresAt)
+    .bind(user.id, sub, type, value, rec.id, expiresAt, ddnsToken)
     .run();
-  return json({ ok: true, created: true, fqdn, type, value, expires_at: expiresAt });
+  return json({ ok: true, created: true, fqdn, type, value, expires_at: expiresAt, ddns_token: ddnsToken });
 }
 
 /** 续期：剩余 <= 6 个月时可续期，续期后重新计 1 年 */
@@ -532,6 +553,68 @@ async function handleDeleteRecord(request: Request, env: Env, path: string): Pro
   }
   await env.DB.prepare('DELETE FROM records WHERE id = ?1').bind(id).run();
   return json({ ok: true });
+}
+
+// ---------- DDNS 动态更新 ----------
+/**
+ * GET /api/ddns?token=xxx&ip=1.2.3.4
+ * 无需登录，凭记录级 token 更新 IP（dyndns2 风格响应）：
+ *   good <ip> / nochg <ip> / badauth / nohost / notfqdn / 911
+ */
+async function handleDDNS(request: Request, env: Env): Promise<Response> {
+  if (rateLimited('ddns:' + clientIp(request), 60, 60_000)) {
+    return ddnsText('911');
+  }
+  const url = new URL(request.url);
+  const token = (url.searchParams.get('token') ?? '').trim();
+  const ipParam = (url.searchParams.get('ip') ?? '').trim();
+  if (!token || token.length < 16) return ddnsText('badauth');
+
+  const rec = await env.DB.prepare(
+    'SELECT id, subdomain, type, value, cf_record_id, expires_at FROM records WHERE ddns_token = ?1',
+  )
+    .bind(token)
+    .first<{ id: number; subdomain: string; type: string; value: string; cf_record_id: string | null; expires_at: number | null }>();
+  if (!rec) return ddnsText('nohost');
+  if (rec.expires_at !== null && rec.expires_at < Date.now()) return ddnsText('nohost');
+  if (rec.type === 'CNAME') return ddnsText('notfqdn');
+
+  const newIp = ipParam || request.headers.get('CF-Connecting-IP') || '';
+  const err = validateValue(rec.type, newIp, env.ROOT_DOMAIN);
+  if (err) return ddnsText('911');
+
+  if (newIp === rec.value) return ddnsText(`nochg ${newIp}`);
+
+  const cf = new CfDns(env.CF_API_TOKEN, env.CF_ZONE_ID);
+  try {
+    await cf.update(rec.cf_record_id ?? '', {
+      type: rec.type,
+      name: `${rec.subdomain}.${env.ROOT_DOMAIN}`,
+      content: newIp,
+    });
+  } catch (e) {
+    console.error('DDNS 更新失败:', e);
+    return ddnsText('911');
+  }
+  await env.DB.prepare('UPDATE records SET value = ?1, updated_at = ?2 WHERE id = ?3')
+    .bind(newIp, new Date().toISOString(), rec.id)
+    .run();
+  return ddnsText(`good ${newIp}`);
+}
+
+/** 重置某条记录的 DDNS 令牌（需登录，仅本人） */
+async function handleRegenDDNSToken(request: Request, env: Env, path: string): Promise<Response> {
+  const user = await requireUser(request, env);
+  const m = path.match(/^\/api\/records\/(\d+)\/ddns-token$/);
+  if (!m) return json({ error: 'not found' }, 404);
+  const id = Number(m[1]);
+  const rec = await env.DB.prepare('SELECT id FROM records WHERE id = ?1 AND user_id = ?2')
+    .bind(id, user.id)
+    .first<{ id: number }>();
+  if (!rec) return json({ error: '记录不存在或无权操作' }, 404);
+  const token = genToken();
+  await env.DB.prepare('UPDATE records SET ddns_token = ?1 WHERE id = ?2').bind(token, id).run();
+  return json({ ok: true, ddns_token: token });
 }
 
 // ---------- 管理员 ----------
@@ -597,9 +680,47 @@ async function runExpiryCleanup(env: Env): Promise<number> {
   return n;
 }
 
+// ---------- 到期提醒（邮件） ----------
+/** 对剩余 <=30 天（level 1）和 <=7 天（level 2）且未提醒过的记录各发一次邮件 */
+async function runExpiryReminders(env: Env): Promise<number> {
+  const day = 86_400_000;
+  const now = Date.now();
+  const rows = await env.DB.prepare(
+    `SELECT r.id, r.subdomain, r.expires_at, r.reminder_level, u.email
+     FROM records r JOIN users u ON u.id = r.user_id
+     WHERE u.email IS NOT NULL AND u.email_verified = 1 AND r.expires_at IS NOT NULL`,
+  ).all<{ id: number; subdomain: string; expires_at: number; reminder_level: number; email: string }>();
+  let n = 0;
+  for (const r of rows.results ?? []) {
+    const remain = r.expires_at - now;
+    if (remain <= 0) continue; // 到期交给清理任务
+    const days = Math.floor(remain / day);
+    const level = r.reminder_level ?? 0;
+    let next = level;
+    try {
+      if (days <= 7 && level < 2) {
+        await sendExpiryReminder(env, r.email, r.subdomain, Math.max(days, 1));
+        next = 2;
+      } else if (days <= 30 && level < 1) {
+        await sendExpiryReminder(env, r.email, r.subdomain, days);
+        next = 1;
+      } else {
+        continue;
+      }
+      await env.DB.prepare('UPDATE records SET reminder_level = ?1 WHERE id = ?2').bind(next, r.id).run();
+      n += 1;
+    } catch (e) {
+      console.error(`提醒发送失败 ${r.subdomain}:`, e);
+    }
+  }
+  return n;
+}
+
 // ---------- 定时任务（每日 03:00 UTC） ----------
 async function scheduled(_event: ScheduledController, env: Env, _ctx: ExecutionContext): Promise<void> {
   try {
+    const reminded = await runExpiryReminders(env);
+    console.log(`[cron] 到期提醒发送 ${reminded} 封`);
     const released = await runExpiryCleanup(env);
     console.log(`[cron] 到期清理完成，释放 ${released} 个`);
   } catch (e) {
@@ -644,6 +765,10 @@ export default {
         case '/api/records/check':
           if (request.method === 'GET') return await handleCheckRecord(request, env);
           break;
+        case '/api/ddns':
+          // DDNS 动态更新：无需登录，凭 token 更新 IP（dyndns2 风格）
+          if (request.method === 'GET') return await handleDDNS(request, env);
+          break;
         case '/api/admin/users':
           if (request.method === 'POST') return await handleAdminCreateUser(request, env);
           break;
@@ -654,6 +779,9 @@ export default {
 
       if (path.startsWith('/api/records/') && path.endsWith('/renew') && request.method === 'POST') {
         return await handleRenewRecord(request, env, path);
+      }
+      if (path.startsWith('/api/records/') && path.endsWith('/ddns-token') && request.method === 'POST') {
+        return await handleRegenDDNSToken(request, env, path);
       }
       if (path.startsWith('/api/records/') && request.method === 'DELETE') {
         return await handleDeleteRecord(request, env, path);

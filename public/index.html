@@ -552,6 +552,63 @@
     });
     table.appendChild(tbody);
     box.appendChild(table);
+    renderDDNS(box);
+  }
+
+  function copyText(text, okMsg) {
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+      navigator.clipboard.writeText(text).then(function () { toast(okMsg || '已复制', 'ok'); }, function () { toast('复制失败，请手动选择复制', 'err'); });
+    } else {
+      var ta = document.createElement('textarea');
+      ta.value = text;
+      document.body.appendChild(ta);
+      ta.select();
+      try { document.execCommand('copy'); toast(okMsg || '已复制', 'ok'); } catch (e) { toast('复制失败', 'err'); }
+      document.body.removeChild(ta);
+    }
+  }
+
+  function renderDDNS(box) {
+    var title = document.createElement('h3');
+    title.style.cssText = 'margin:20px 0 6px';
+    title.textContent = 'DDNS 动态更新';
+    box.appendChild(title);
+    var tip = document.createElement('p');
+    tip.className = 'muted small';
+    tip.textContent = '家庭宽带 IP 变化时，用下面的地址自动更新 A/AAAA 记录（支持 ddclient / 路由器 / curl）。';
+    box.appendChild(tip);
+
+    state.records.forEach(function (r) {
+      var wrap = document.createElement('div');
+      wrap.style.cssText = 'display:flex;align-items:center;gap:8px;margin:10px 0;flex-wrap:wrap';
+      var name = document.createElement('code');
+      name.textContent = r.subdomain + '.' + state.rootDomain;
+      var url = document.createElement('code');
+      url.style.cssText = 'flex:1;min-width:220px;word-break:break-all';
+      url.textContent = '/api/ddns?token=' + (r.ddns_token || '') + '&ip=';
+      var copy = document.createElement('button');
+      copy.type = 'button';
+      copy.className = 'btn btn-sm';
+      copy.textContent = '复制';
+      copy.addEventListener('click', function () { copyText(location.origin + url.textContent, 'DDNS 地址已复制'); });
+      var regen = document.createElement('button');
+      regen.type = 'button';
+      regen.className = 'btn btn-sm';
+      regen.textContent = '重置令牌';
+      regen.addEventListener('click', function () { regenDDNS(r); });
+      wrap.appendChild(name); wrap.appendChild(url); wrap.appendChild(copy); wrap.appendChild(regen);
+      box.appendChild(wrap);
+    });
+  }
+
+  function regenDDNS(r) {
+    if (!window.confirm('确定重置 ' + r.subdomain + '.' + state.rootDomain + ' 的 DDNS 令牌吗？旧地址将立即失效。')) return;
+    api('/api/records/' + r.id + '/ddns-token', { method: 'POST' })
+      .then(function (data) {
+        toast('令牌已重置', 'ok');
+        loadAll();
+      })
+      .catch(function (e) { toast(e.message, 'err'); });
   }
 
   function renewRecord(r) {
