@@ -81,22 +81,6 @@
   .hero h1 .accent { color: var(--accent); font-style: italic; }
   .hero p.sub { color: var(--ink-soft); font-size: 17px; max-width: 620px; margin: 20px auto 32px; }
   .hero .cta-row { display: flex; gap: 14px; justify-content: center; flex-wrap: wrap; }
-  .hero-check {
-    display: flex; align-items: center; justify-content: center; gap: 0;
-    max-width: 520px; margin: 0 auto 8px;
-    background: #fff; border: 1px solid var(--line); border-radius: 12px;
-    overflow: hidden; box-shadow: 0 2px 10px -4px rgba(28,23,18,.12);
-  }
-  .hero-check:focus-within { border-color: var(--accent); box-shadow: 0 0 0 3px rgba(194,65,12,.12); }
-  .hero-check input {
-    flex: 1; min-width: 0; border: none; outline: none; background: transparent;
-    padding: 14px 16px; font-size: 16px; color: var(--ink); margin: 0;
-  }
-  .hero-suffix { font-family: var(--mono); color: var(--ink-soft); font-size: 15px; padding-right: 12px; white-space: nowrap; }
-  .hero-check .btn { border-radius: 0; border: none; border-left: 1px solid var(--line); height: 100%; padding: 14px 22px; }
-  .hero-avail { justify-content: center; margin: 0 0 4px; min-height: 26px; }
-  .hero-avail.free { color: var(--ok); font-weight: 600; }
-  .hero-avail.taken { color: var(--danger); font-weight: 600; }
   .hero .stat-row { display: flex; gap: 44px; justify-content: center; margin-top: 48px; flex-wrap: wrap; }
   .hero .stat { border-left: 2px solid var(--line); padding-left: 16px; text-align: left; }
   .hero .stat b { display: block; font-family: var(--serif); font-size: 28px; color: var(--ink); }
@@ -192,12 +176,63 @@
   .hidden { display: none !important; }
   .muted { color: var(--ink-soft); }
   .small { font-size: 12px; }
+  /* 勾选框 + 链接 */
+  .checkbox-line { display: flex; align-items: flex-start; gap: 8px; font-size: 13px; color: var(--ink-soft); margin-bottom: 14px; cursor: pointer; }
+  .checkbox-line input { width: auto; margin: 3px 0 0 0; }
+  .link { color: var(--accent); cursor: pointer; text-decoration: underline; }
+  .link:hover { color: var(--accent-2); }
+  /* 侧边栏布局 */
+  .dash-layout { display: flex; gap: 22px; align-items: flex-start; padding-top: 24px; padding-bottom: 40px; }
+  .sidebar {
+    flex: 0 0 210px; position: sticky; top: 84px;
+    background: var(--card); border: 1px solid var(--line); border-radius: var(--radius);
+    padding: 18px 12px; display: flex; flex-direction: column; gap: 14px;
+  }
+  .side-brand { font-family: var(--serif); font-size: 19px; font-weight: 700; padding: 0 10px; }
+  .side-brand .dot { color: var(--accent); }
+  .side-user { font-size: 13px; color: var(--ink-soft); padding: 0 10px; word-break: break-all; line-height: 1.4; border-bottom: 1px solid var(--line); padding-bottom: 12px; }
+  .side-nav { display: flex; flex-direction: column; gap: 4px; }
+  .side-btn {
+    display: block; width: 100%; text-align: left; background: transparent; border: none;
+    padding: 10px 12px; border-radius: 9px; font-size: 14px; color: var(--ink-soft);
+    cursor: pointer; transition: background .15s, color .15s;
+  }
+  .side-btn:hover { background: var(--paper2); color: var(--ink); }
+  .side-btn.active { background: var(--ink); color: var(--paper); font-weight: 600; }
+  .side-foot { margin-top: auto; border-top: 1px solid var(--line); padding-top: 10px; }
+  #side-logout { color: var(--danger); }
+  .dash-content { flex: 1; min-width: 0; }
+  .dash-panel { display: none; }
+  .dash-panel.active { display: block; animation: fadeIn .3s ease; }
+  @keyframes fadeIn { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: none; } }
+  /* 悬浮窗 */
+  .modal-overlay {
+    position: fixed; inset: 0; z-index: 200; background: rgba(28,23,18,.45);
+    display: flex; align-items: center; justify-content: center; padding: 20px;
+  }
+  .modal-box {
+    background: var(--card); border: 1px solid var(--line); border-radius: var(--radius);
+    max-width: 560px; width: 100%; max-height: 80vh; display: flex; flex-direction: column;
+    box-shadow: 0 20px 60px -20px rgba(28,23,18,.4);
+  }
+  .modal-head { display: flex; align-items: center; justify-content: space-between; padding: 16px 20px; border-bottom: 1px solid var(--line); }
+  .modal-head h3 { font-family: var(--serif); font-size: 18px; }
+  .modal-close { background: transparent; border: none; font-size: 18px; cursor: pointer; color: var(--ink-soft); }
+  .modal-close:hover { color: var(--ink); }
+  .modal-body { padding: 18px 22px; overflow-y: auto; font-size: 13.5px; color: var(--ink-soft); line-height: 1.8; }
+  .modal-body h4 { color: var(--ink); margin: 14px 0 6px; font-size: 14.5px; }
+  .modal-body ul { padding-left: 18px; margin: 6px 0; display: grid; gap: 4px; }
   @media (max-width: 640px) {
     .hero h1 { font-size: 34px; }
     .nav-links { display: none; }
     .form-row { flex-direction: column; gap: 0; }
     table { font-size: 12.5px; }
     th:nth-child(4), td:nth-child(4) { display: none; }
+    .dash-layout { flex-direction: column; }
+    .sidebar { position: static; flex: none; width: 100%; flex-direction: column; }
+    .side-nav { flex-direction: row; flex-wrap: wrap; }
+    .side-btn { width: auto; }
+    .side-foot { margin-top: 0; }
   }
 </style>
 </head>
@@ -221,12 +256,6 @@
     <span class="badge">⚡ 免费 · 注册即用 · 1 年有效期可续期</span>
     <h1>免费二级域名<br><span class="accent">xxx.fblog.cyou</span></h1>
     <p class="sub">为个人开发者、学习项目、家庭服务器提供免费的二级域名。支持 A / AAAA / CNAME 记录，提交即生效，全球 Cloudflare 节点解析。</p>
-    <div class="hero-check">
-      <input id="hero-sub" maxlength="63" placeholder="输入你想要的前缀，例如 myblog" autocomplete="off">
-      <span class="hero-suffix">.fblog.cyou</span>
-      <button class="btn btn-primary" id="hero-check-btn" type="button">检测可用性</button>
-    </div>
-    <div class="avail hero-avail" id="hero-avail"></div>
     <div class="cta-row">
       <a class="btn btn-primary" href="#" data-goto="register">免费注册</a>
       <a class="btn" href="#" data-goto="login">登录</a>
@@ -273,7 +302,7 @@
     </div>
   </section>
 
-  <footer class="wrap">fblog.cyou 免费二级域名分发平台 · 由 Cloudflare Workers + D1 驱动 · 参考 dpdns.org 免费域名服务模式</footer>
+  <footer class="wrap"></footer>
 </div>
 
 <!-- ============ 登录 ============ -->
@@ -309,6 +338,10 @@
         <input id="reg-email" type="email" autocomplete="email" placeholder="you@example.com" required>
         <label>密码 <span class="small muted">（至少 8 位）</span></label>
         <input id="reg-password" type="password" autocomplete="new-password" required>
+        <label class="checkbox-line">
+          <input type="checkbox" id="reg-agree">
+          <span>我已阅读并同意 <a class="link" data-modal="rules">《使用规则》</a> 与 <a class="link" data-modal="disclaimer">《免责声明》</a></span>
+        </label>
         <div id="reg-msg" class="msg"></div>
         <button class="btn btn-primary" style="width:100%" type="submit" id="reg-send-btn">发送验证码</button>
       </form>
@@ -356,42 +389,98 @@
 
 <!-- ============ 仪表盘 ============ -->
 <div id="view-dash" class="hidden">
-  <div class="wrap">
-    <div class="dash-head">
-      <h1>我的子域名 <span class="small muted" id="dash-email"></span></h1>
-      <div class="quota-bar"><span>配额</span><div class="quota-track"><div class="quota-fill" id="quota-fill" style="width:0%"></div></div><span id="quota-text">0 / 2</span></div>
-    </div>
+  <div class="wrap dash-layout">
+    <aside class="sidebar">
+      <div class="side-brand">fblog<span class="dot">.cyou</span></div>
+      <div class="side-user" id="side-user"></div>
+      <nav class="side-nav">
+        <button class="side-btn active" data-panel="records">🗂 我的子域名</button>
+        <button class="side-btn" data-panel="create">➕ 申请子域名</button>
+        <button class="side-btn" data-panel="ddns">🔄 DDNS 管理</button>
+        <button class="side-btn" data-panel="account">👤 账号信息</button>
+        <button class="side-btn" data-panel="rules">📜 使用规则</button>
+      </nav>
+      <div class="side-foot">
+        <button class="side-btn" id="side-logout">退出登录</button>
+      </div>
+    </aside>
 
-    <div class="dash-card" style="margin-bottom:18px">
-      <h3 style="margin-bottom:14px">申请 / 更新子域名</h3>
-      <form id="create-form">
-        <div class="form-row">
-          <div class="grow">
-            <label>前缀</label>
-            <input id="create-sub" placeholder="例如 myapp" required>
-            <div class="avail" id="avail-box"></div>
-          </div>
-          <div style="min-width:150px">
-            <label>类型</label>
-            <select id="create-type">
-              <option value="A">A（IPv4）</option>
-              <option value="AAAA">AAAA（IPv6）</option>
-              <option value="CNAME">CNAME</option>
-            </select>
-          </div>
+    <main class="dash-content">
+      <div class="dash-panel active" id="panel-records">
+        <div class="dash-head">
+          <h1>我的子域名</h1>
+          <div class="quota-bar"><span>配额</span><div class="quota-track"><div class="quota-fill" id="quota-fill" style="width:0%"></div></div><span id="quota-text">0 / 2</span></div>
         </div>
-        <label id="value-label">目标 IPv4</label>
-        <input id="create-value" placeholder="例如 1.2.3.4" required>
-        <div id="create-msg" class="msg"></div>
-        <button class="btn btn-primary" type="submit">创建 / 更新</button>
-        <span class="small muted" style="margin-left:10px">有效期 1 年；相同「前缀+类型」提交 = 更新，不影响到期时间</span>
-      </form>
-    </div>
+        <div class="dash-card">
+          <div id="records-box"></div>
+        </div>
+      </div>
 
-    <div class="dash-card">
-      <h3 style="margin-bottom:6px">我的子域名</h3>
-      <div id="records-box"></div>
+      <div class="dash-panel" id="panel-create">
+        <div class="dash-head"><h1>申请子域名</h1></div>
+        <div class="dash-card">
+          <form id="create-form">
+            <div class="form-row">
+              <div class="grow">
+                <label>前缀</label>
+                <input id="create-sub" placeholder="例如 myapp" required>
+                <div class="avail" id="avail-box"></div>
+              </div>
+              <div style="min-width:150px">
+                <label>类型</label>
+                <select id="create-type">
+                  <option value="A">A（IPv4）</option>
+                  <option value="AAAA">AAAA（IPv6）</option>
+                  <option value="CNAME">CNAME</option>
+                </select>
+              </div>
+            </div>
+            <label id="value-label">目标 IPv4</label>
+            <input id="create-value" placeholder="例如 1.2.3.4" required>
+            <div id="create-msg" class="msg"></div>
+            <button class="btn btn-primary" type="submit">创建 / 更新</button>
+            <span class="small muted" style="margin-left:10px">有效期 1 年；相同「前缀+类型」提交 = 更新，不影响到期时间</span>
+          </form>
+        </div>
+      </div>
+
+      <div class="dash-panel" id="panel-ddns">
+        <div class="dash-head"><h1>DDNS 动态更新</h1></div>
+        <div class="dash-card">
+          <p class="muted" style="margin-bottom:14px">家庭宽带 IP 变化时，用下面的地址自动更新 A/AAAA 记录（支持 ddclient / 路由器 / curl）。</p>
+          <div id="ddns-box"></div>
+        </div>
+      </div>
+
+      <div class="dash-panel" id="panel-account">
+        <div class="dash-head"><h1>账号信息</h1></div>
+        <div class="dash-card" id="account-box"></div>
+      </div>
+
+      <div class="dash-panel" id="panel-rules">
+        <div class="dash-head"><h1>使用规则</h1></div>
+        <div class="rules">
+          <ul>
+            <li>禁止用于钓鱼、诈骗、盗版、垃圾邮件、赌博等违法或滥用用途；</li>
+            <li>每个账号最多创建 <b>2 个</b>子域名，仅限个人学习与项目使用；</li>
+            <li>子域名默认有效期 <b>1 年</b>，剩余 ≤ 6 个月可续期，到期未续将自动释放；</li>
+            <li>平台管理员有权依据本规则删除违规记录，无需事先通知；</li>
+            <li>滥用举报与申诉请联系平台管理员。</li>
+          </ul>
+        </div>
+      </div>
+    </main>
+  </div>
+</div>
+
+<!-- ============ 悬浮窗（规则 / 免责声明） ============ -->
+<div class="modal-overlay hidden" id="modal-overlay">
+  <div class="modal-box">
+    <div class="modal-head">
+      <h3 id="modal-title">使用规则</h3>
+      <button class="modal-close" id="modal-close" type="button">✕</button>
     </div>
+    <div class="modal-body" id="modal-body"></div>
   </div>
 </div>
 
@@ -497,6 +586,10 @@
   // ---------- 注册 ----------
   $('#register-form').addEventListener('submit', function (ev) {
     ev.preventDefault();
+    if (!$('#reg-agree').checked) {
+      showMsg($('#reg-msg'), '请先阅读并勾选同意《使用规则》与《免责声明》', 'err');
+      return;
+    }
     var btn = $('#reg-send-btn');
     btn.disabled = true;
     api('/api/register', { method: 'POST', body: { username: $('#reg-username').value, email: $('#reg-email').value, password: $('#reg-password').value } })
@@ -572,9 +665,12 @@
   function loadAll() {
     api('/api/me').then(function (m) {
       state.user = m.username;
+      state.userEmail = m.email;
       state.rootDomain = m.rootDomain;
       state.maxSubdomains = m.maxSubdomains;
-      $('#dash-email').textContent = m.email ? '(' + m.email + ')' : '';
+      state.usedSubdomains = m.usedSubdomains || 0;
+      renderSideUser();
+      renderAccount();
     }).catch(function (e) {
       if (String(e.message).indexOf('登录') !== -1) { state.user = null; showView('landing'); }
     });
@@ -582,12 +678,54 @@
     api('/api/records').then(function (data) {
       state.records = data.records || [];
       state.rootDomain = data.rootDomain;
-      var used = state.records.length;
       var max = data.maxSubdomains || 2;
-      $('#quota-fill').style.width = Math.min(100, used / max * 100) + '%';
-      $('#quota-text').textContent = used + ' / ' + max;
+      $('#quota-fill').style.width = Math.min(100, state.records.length / max * 100) + '%';
+      $('#quota-text').textContent = state.records.length + ' / ' + max;
       renderRecords();
+      renderDDNS();
     }).catch(function () {});
+  }
+
+  function renderSideUser() {
+    var el = $('#side-user');
+    el.textContent = '';
+    var b = document.createElement('div');
+    b.style.cssText = 'font-weight:600;color:var(--ink)';
+    b.textContent = state.user;
+    el.appendChild(b);
+    if (state.userEmail) {
+      var span = document.createElement('div');
+      span.className = 'small';
+      span.textContent = state.userEmail;
+      el.appendChild(span);
+    }
+  }
+
+  function renderAccount() {
+    var box = $('#account-box');
+    box.textContent = '';
+    var rows = [
+      ['用户名', state.user || '-'],
+      ['邮箱', state.userEmail || '未绑定邮箱'],
+      ['子域名配额', (state.usedSubdomains || 0) + ' / ' + state.maxSubdomains]
+    ];
+    var table = document.createElement('table');
+    rows.forEach(function (row) {
+      var tr = document.createElement('tr');
+      var th = document.createElement('th');
+      th.style.width = '120px';
+      th.textContent = row[0];
+      var td = document.createElement('td');
+      td.textContent = row[1];
+      tr.appendChild(th); tr.appendChild(td);
+      table.appendChild(tr);
+    });
+    box.appendChild(table);
+    var hint = document.createElement('p');
+    hint.className = 'muted small';
+    hint.style.marginTop = '14px';
+    hint.textContent = '如需修改密码，可退出后通过「忘记密码」重置。';
+    box.appendChild(hint);
   }
 
   function fmtDate(ts) {
@@ -602,7 +740,7 @@
     if (!state.records.length) {
       var e = document.createElement('div');
       e.className = 'empty';
-      e.textContent = '还没有子域名，先在上面创建一个吧。';
+      e.textContent = '还没有子域名，到「申请子域名」创建一个吧。';
       box.appendChild(e);
       return;
     }
@@ -662,7 +800,6 @@
     });
     table.appendChild(tbody);
     box.appendChild(table);
-    renderDDNS(box);
   }
 
   function copyText(text, okMsg) {
@@ -678,16 +815,16 @@
     }
   }
 
-  function renderDDNS(box) {
-    var title = document.createElement('h3');
-    title.style.cssText = 'margin:20px 0 6px';
-    title.textContent = 'DDNS 动态更新';
-    box.appendChild(title);
-    var tip = document.createElement('p');
-    tip.className = 'muted small';
-    tip.textContent = '家庭宽带 IP 变化时，用下面的地址自动更新 A/AAAA 记录（支持 ddclient / 路由器 / curl）。';
-    box.appendChild(tip);
-
+  function renderDDNS() {
+    var box = $('#ddns-box');
+    box.textContent = '';
+    if (!state.records.length) {
+      var e = document.createElement('div');
+      e.className = 'empty';
+      e.textContent = '还没有子域名，创建后可在此获取 DDNS 更新地址。';
+      box.appendChild(e);
+      return;
+    }
     state.records.forEach(function (r) {
       var wrap = document.createElement('div');
       wrap.style.cssText = 'display:flex;align-items:center;gap:8px;margin:10px 0;flex-wrap:wrap';
@@ -781,39 +918,6 @@
     state.checkTimer = setTimeout(function () { checkAvailability(sub); }, 400);
   });
 
-  // 主页 hero 检测按钮（游客可用）
-  function heroCheck() {
-    var sub = ($('#hero-sub').value || '').trim().toLowerCase();
-    var box = $('#hero-avail');
-    box.textContent = '';
-    if (!sub) { box.className = 'avail'; box.textContent = '请输入前缀'; return; }
-    var sp = document.createElement('div');
-    sp.className = 'spinner';
-    box.appendChild(sp);
-    box.appendChild(document.createTextNode(' 正在检测…'));
-    box.className = 'avail checking';
-    api('/api/records/check?subdomain=' + encodeURIComponent(sub))
-      .then(function (data) {
-        box.textContent = '';
-        if (data.available) {
-          box.className = 'avail hero-avail free';
-          box.textContent = '✓ ' + data.fqdn + ' 可以使用，注册后即可申请';
-        } else {
-          box.className = 'avail hero-avail taken';
-          box.textContent = '✕ ' + (data.reason || '已被占用');
-        }
-      })
-      .catch(function (e) {
-        box.textContent = '';
-        box.className = 'avail hero-avail';
-        box.textContent = e.message;
-      });
-  }
-  $('#hero-check-btn').addEventListener('click', heroCheck);
-  $('#hero-sub').addEventListener('keydown', function (ev) {
-    if (ev.key === 'Enter') { ev.preventDefault(); heroCheck(); }
-  });
-
   $('#create-type').addEventListener('change', function () {
     var t = this.value;
     var label = $('#value-label');
@@ -867,6 +971,60 @@
       showView(v);
     }
   });
+
+  // ---------- 侧边栏切换 ----------
+  document.querySelectorAll('.side-btn[data-panel]').forEach(function (btn) {
+    btn.addEventListener('click', function () {
+      document.querySelectorAll('.side-btn[data-panel]').forEach(function (b) { b.classList.remove('active'); });
+      btn.classList.add('active');
+      var panel = btn.getAttribute('data-panel');
+      document.querySelectorAll('.dash-panel').forEach(function (p) { p.classList.remove('active'); });
+      var target = document.getElementById('panel-' + panel);
+      if (target) target.classList.add('active');
+    });
+  });
+
+  // ---------- 侧边栏退出 ----------
+  $('#side-logout').addEventListener('click', function () {
+    api('/api/logout', { method: 'POST' }).then(function () {
+      state.user = null; state.userEmail = null;
+      showView('landing');
+      toast('已退出登录', 'info');
+    }).catch(function () { showView('landing'); });
+  });
+
+  // ---------- 悬浮窗（使用规则 / 免责声明） ----------
+  var MODAL_CONTENT = {
+    rules: '<h4>平台使用规则</h4><ul>' +
+      '<li>禁止用于钓鱼、诈骗、盗版、垃圾邮件、赌博等违法或滥用用途；</li>' +
+      '<li>每个账号最多创建 2 个子域名，仅限个人学习与项目使用；</li>' +
+      '<li>子域名默认有效期 1 年，剩余 ≤ 6 个月可续期，到期未续将自动释放；</li>' +
+      '<li>平台管理员有权依据本规则删除违规记录，无需事先通知；</li>' +
+      '<li>滥用举报与申诉请联系平台管理员。</li>' +
+      '</ul>',
+    disclaimer: '<h4>免责声明</h4>' +
+      '<p>本平台为免费个人服务，不对服务的可用性、连续性、安全性作任何明示或默示的保证。</p>' +
+      '<p>用户须对通过本平台创建的子域名下的全部内容与行为自行负责；因用户滥用导致的删除、封禁或域名释放，平台不承担任何责任。</p>' +
+      '<p>域名解析基于 Cloudflare 基础设施，相关服务受 Cloudflare 服务条款约束。</p>' +
+      '<p>平台保留随时调整服务规则与功能的权利。</p>'
+  };
+
+  document.addEventListener('click', function (e) {
+    var t = e.target, m = null;
+    while (t && t !== document) {
+      if (t.hasAttribute && t.hasAttribute('data-modal')) { m = t; break; }
+      t = t.parentNode;
+    }
+    if (m) {
+      e.preventDefault();
+      var key = m.getAttribute('data-modal');
+      $('#modal-title').textContent = key === 'rules' ? '使用规则' : '免责声明';
+      $('#modal-body').innerHTML = MODAL_CONTENT[key] || '';
+      $('#modal-overlay').classList.remove('hidden');
+    }
+  });
+  $('#modal-close').addEventListener('click', function () { $('#modal-overlay').classList.add('hidden'); });
+  $('#modal-overlay').addEventListener('click', function (e) { if (e.target === this) $('#modal-overlay').classList.add('hidden'); });
 
   // ---------- 初始化 ----------
   api('/api/me')
