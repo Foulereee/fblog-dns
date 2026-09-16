@@ -3,252 +3,156 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<meta name="description" content="fblog.cyou 免费二级域名分发平台：注册即可免费申请 xxx.fblog.cyou 子域名，支持 A/AAAA/CNAME，1 年有效期可续期。">
+<meta name="description" content="fblog.cyou 免费二级域名分发平台：注册即可免费申请 xxx.fblog.cyou 二级域名，支持 A/AAAA/CNAME 记录，1 年有效期可续期，提供 DDNS 动态解析。">
 <title>fblog.cyou · 免费二级域名分发平台</title>
+<meta name="robots" content="index,follow">
+<link rel="canonical" href="https://dns.fblog.cyou/">
 <style>
   :root {
-    --paper: #f6f1e6;
-    --paper2: #eee6d5;
-    --card: #fffdf7;
-    --ink: #1c1712;
-    --ink-soft: #5c5343;
-    --line: #e2d8c3;
-    --accent: #c2410c;
-    --accent-2: #b45309;
-    --ok: #15803d;
-    --warn: #b45309;
-    --danger: #b91c1c;
+    --paper: #f6f1e6; --paper2: #eee6d5; --card: #fffdf7;
+    --ink: #1c1712; --ink-soft: #5c5343; --line: #e2d8c3;
+    --accent: #c2410c; --accent-2: #b45309; --ok: #15803d; --warn: #b45309; --danger: #b91c1c;
     --radius: 14px;
     --serif: Georgia, "Times New Roman", "Songti SC", "Noto Serif SC", serif;
-    --mono: ui-monospace, "SF Mono", "Cascadia Mono", Consolas, monospace;
+    --mono: ui-monospace, "SF Mono", Consolas, monospace;
   }
   * { box-sizing: border-box; margin: 0; padding: 0; }
   html { scroll-behavior: smooth; }
-  body {
-    font-family: system-ui, -apple-system, "PingFang SC", "Microsoft YaHei", "Segoe UI", sans-serif;
-    background: var(--paper);
-    color: var(--ink);
-    line-height: 1.7;
-    min-height: 100vh;
-    position: relative;
-    overflow-x: hidden;
-  }
-  /* 细颗粒纸纹，去机器感 */
-  body::after {
-    content: ""; position: fixed; inset: 0; z-index: -2; pointer-events: none;
-    background-image: radial-gradient(rgba(28,23,18,.04) 1px, transparent 1px);
-    background-size: 22px 22px;
-  }
+  body { font-family: system-ui, -apple-system, "PingFang SC", "Microsoft YaHei", "Segoe UI", sans-serif; background: var(--paper); color: var(--ink); line-height: 1.7; min-height: 100vh; position: relative; overflow-x: hidden; }
+  body::after { content:""; position: fixed; inset:0; z-index:-2; pointer-events:none; background-image: radial-gradient(rgba(28,23,18,.04) 1px, transparent 1px); background-size:22px 22px; }
   #bg { position: fixed; inset: 0; z-index: -1; pointer-events: none; }
   .wrap { max-width: 1060px; margin: 0 auto; padding: 0 22px; position: relative; }
-  /* Nav */
-  nav {
-    position: sticky; top: 0; z-index: 50;
-    background: rgba(246,241,230,.82); backdrop-filter: blur(14px);
-    border-bottom: 1px solid var(--line);
-  }
-  .nav-inner { display: flex; align-items: center; justify-content: space-between; height: 62px; }
-  .logo { font-family: var(--serif); font-size: 21px; font-weight: 700; letter-spacing: .3px; color: var(--ink); text-decoration: none; }
+  nav { position: sticky; top: 0; z-index: 50; background: rgba(246,241,230,.85); backdrop-filter: blur(14px); border-bottom: 1px solid var(--line); }
+  .nav-inner { display: flex; align-items: center; justify-content: space-between; height: 62px; gap: 12px; }
+  .logo { font-family: var(--serif); font-size: 21px; font-weight: 700; letter-spacing:.3px; color: var(--ink); text-decoration: none; }
   .logo .dot { color: var(--accent); }
-  .nav-links { display: flex; gap: 26px; align-items: center; }
-  .nav-links a { color: var(--ink-soft); text-decoration: none; font-size: 14px; position: relative; }
+  .nav-links { display: flex; gap: 22px; align-items: center; }
+  .nav-links a { color: var(--ink-soft); text-decoration: none; font-size: 14px; cursor: pointer; }
   .nav-links a:hover { color: var(--ink); }
-  .nav-links a::after { content: ""; position: absolute; left: 0; bottom: -4px; width: 0; height: 2px; background: var(--accent); transition: width .25s; }
-  .nav-links a:hover::after { width: 100%; }
   .nav-cta { display: flex; gap: 10px; align-items: center; }
-  /* Buttons */
-  .btn {
-    display: inline-flex; align-items: center; justify-content: center; gap: 6px;
-    border: 1px solid var(--line); background: transparent; color: var(--ink);
-    border-radius: 10px; padding: 9px 18px; font-size: 14px; font-weight: 600;
-    cursor: pointer; text-decoration: none; transition: all .18s;
-  }
+  .btn { display: inline-flex; align-items:center; justify-content:center; gap:6px; border:1px solid var(--line); background:transparent; color:var(--ink); border-radius:10px; padding:9px 18px; font-size:14px; font-weight:600; cursor:pointer; text-decoration:none; transition:all .18s; }
   .btn:hover { border-color: var(--ink); transform: translateY(-1px); }
-  .btn-primary { background: var(--ink); border: 1px solid var(--ink); color: var(--paper); }
-  .btn-primary:hover { background: var(--accent); border-color: var(--accent); color: #fff; }
+  .btn-primary { background: var(--ink); border:1px solid var(--ink); color: var(--paper); }
+  .btn-primary:hover { background: var(--accent); border-color: var(--accent); color:#fff; }
   .btn-danger { border-color: rgba(185,28,28,.45); color: var(--danger); }
   .btn-danger:hover { background: rgba(185,28,28,.08); border-color: var(--danger); color: var(--danger); }
-  .btn-sm { padding: 5px 13px; font-size: 13px; border-radius: 8px; }
-  .btn[disabled] { opacity: .45; cursor: not-allowed; }
-  /* Hero */
-  .hero { padding: 90px 0 70px; text-align: center; }
-  .hero .badge {
-    display: inline-block; font-size: 12px; color: var(--accent);
-    border: 1px solid rgba(194,65,12,.3); background: rgba(194,65,12,.06);
-    padding: 4px 14px; border-radius: 99px; margin-bottom: 22px; letter-spacing: .5px;
-  }
-  .hero h1 { font-family: var(--serif); font-size: 50px; font-weight: 700; letter-spacing: -.5px; line-height: 1.15; }
+  .btn-sm { padding:5px 13px; font-size:13px; border-radius:8px; }
+  .btn[disabled] { opacity:.45; cursor:not-allowed; }
+  .hero { padding: 80px 0 56px; text-align: center; }
+  .hero .badge { display:inline-block; font-size:12px; color:var(--accent); border:1px solid rgba(194,65,12,.3); background:rgba(194,65,12,.06); padding:4px 14px; border-radius:99px; margin-bottom:20px; letter-spacing:.5px; }
+  .hero h1 { font-family: var(--serif); font-size: 46px; font-weight:700; letter-spacing:-.5px; line-height:1.15; }
   .hero h1 .accent { color: var(--accent); font-style: italic; }
-  .hero p.sub { color: var(--ink-soft); font-size: 17px; max-width: 620px; margin: 20px auto 32px; }
-  .hero .cta-row { display: flex; gap: 14px; justify-content: center; flex-wrap: wrap; }
-  .hero-check {
-    display: flex; align-items: center; justify-content: center; gap: 0;
-    max-width: 520px; margin: 0 auto 8px;
-    background: #fff; border: 1px solid var(--line); border-radius: 12px;
-    overflow: hidden; box-shadow: 0 2px 10px -4px rgba(28,23,18,.12);
-  }
+  .hero p.sub { color: var(--ink-soft); font-size:17px; max-width:620px; margin:18px auto 28px; }
+  .hero-check { display:flex; align-items:center; justify-content:center; gap:0; max-width:520px; margin:0 auto 8px; background:#fff; border:1px solid var(--line); border-radius:12px; overflow:hidden; box-shadow:0 2px 10px -4px rgba(28,23,18,.12); }
   .hero-check:focus-within { border-color: var(--accent); box-shadow: 0 0 0 3px rgba(194,65,12,.12); }
-  .hero-check input {
-    flex: 1; min-width: 0; border: none; outline: none; background: transparent;
-    padding: 14px 16px; font-size: 16px; color: var(--ink); margin: 0;
-  }
-  .hero-suffix { font-family: var(--mono); color: var(--ink-soft); font-size: 15px; padding-right: 12px; white-space: nowrap; }
-  .hero-check .btn { border-radius: 0; border: none; border-left: 1px solid var(--line); height: 100%; padding: 14px 22px; }
-  .hero-avail { justify-content: center; margin: 0 0 4px; min-height: 26px; }
-  .hero-avail.free { color: var(--ok); font-weight: 600; }
-  .hero-avail.taken { color: var(--danger); font-weight: 600; }
-  .hero .stat-row { display: flex; gap: 44px; justify-content: center; margin-top: 48px; flex-wrap: wrap; }
-  .hero .stat { border-left: 2px solid var(--line); padding-left: 16px; text-align: left; }
-  .hero .stat b { display: block; font-family: var(--serif); font-size: 28px; color: var(--ink); }
-  .hero .stat span { font-size: 13px; color: var(--ink-soft); }
-  /* Sections */
-  section { padding: 60px 0; }
-  section h2 { font-family: var(--serif); font-size: 30px; font-weight: 700; text-align: center; margin-bottom: 40px; letter-spacing: -.3px; }
-  .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(255px, 1fr)); gap: 18px; }
-  .card {
-    background: var(--card); border: 1px solid var(--line); border-radius: var(--radius);
-    padding: 24px; transition: transform .2s, box-shadow .2s;
-    box-shadow: 0 1px 2px rgba(28,23,18,.04);
-  }
-  .card:hover { transform: translateY(-4px); box-shadow: 0 10px 30px -12px rgba(28,23,18,.18); }
-  .card .icon { font-size: 28px; margin-bottom: 14px; display: inline-block; }
-  .card h3 { font-family: var(--serif); font-size: 18px; margin-bottom: 8px; font-weight: 700; }
-  .card p { color: var(--ink-soft); font-size: 13.5px; }
-  .steps { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 18px; }
-  .step { text-align: center; padding: 26px 16px; }
-  .step .num {
-    width: 44px; height: 44px; margin: 0 auto 14px; border-radius: 50%;
-    background: var(--ink); color: var(--paper);
-    font-family: var(--serif); font-weight: 700; font-size: 19px;
-    display: flex; align-items: center; justify-content: center;
-  }
-  .step h3 { font-family: var(--serif); font-size: 17px; margin-bottom: 6px; }
-  .step p { color: var(--ink-soft); font-size: 13.5px; }
-  /* Rules */
-  .rules { border: 1px solid var(--line); border-left: 4px solid var(--warn); background: var(--card); border-radius: var(--radius); padding: 24px 28px; }
-  .rules h3 { color: var(--warn); margin-bottom: 10px; font-family: var(--serif); font-size: 17px; }
-  .rules ul { color: var(--ink-soft); font-size: 13.5px; padding-left: 20px; display: grid; gap: 7px; }
-  /* Footer */
-  footer { border-top: 1px solid var(--line); padding: 30px 0 44px; text-align: center; color: var(--ink-soft); font-size: 13px; }
-  /* Auth / Dashboard panels */
-  .panel { max-width: 460px; margin: 44px auto; }
-  .panel .title { font-family: var(--serif); font-size: 26px; font-weight: 700; text-align: center; margin-bottom: 6px; }
-  .panel .subtitle { text-align: center; color: var(--ink-soft); font-size: 13.5px; margin-bottom: 24px; }
-  .auth-card, .dash-card { background: var(--card); border: 1px solid var(--line); border-radius: var(--radius); padding: 28px; box-shadow: 0 4px 24px -12px rgba(28,23,18,.12); }
-  label { display: block; font-size: 13px; color: var(--ink-soft); margin-bottom: 6px; }
-  input, select {
-    width: 100%; padding: 11px 13px; margin-bottom: 16px;
-    background: #fff; border: 1px solid var(--line); border-radius: 9px;
-    color: var(--ink); font-size: 14px; transition: border-color .15s, box-shadow .15s;
-  }
-  input:focus, select:focus { outline: none; border-color: var(--accent); box-shadow: 0 0 0 3px rgba(194,65,12,.12); }
-  .form-row { display: flex; gap: 10px; }
-  .form-row .grow { flex: 1; }
-  .hint { font-size: 12.5px; color: var(--ink-soft); margin-top: -10px; margin-bottom: 14px; }
-  .msg { margin: 12px 0; padding: 11px 13px; border-radius: 8px; font-size: 13.5px; display: none; }
-  .msg.show { display: block; }
-  .msg.err { background: rgba(185,28,28,.07); color: var(--danger); border: 1px solid rgba(185,28,28,.25); }
-  .msg.ok { background: rgba(21,128,61,.07); color: var(--ok); border: 1px solid rgba(21,128,61,.25); }
-  .msg.info { background: rgba(194,65,12,.06); color: var(--accent); border: 1px solid rgba(194,65,12,.22); }
-  .switch-line { text-align: center; font-size: 13.5px; color: var(--ink-soft); margin-top: 16px; }
-  .switch-line a { color: var(--accent); cursor: pointer; text-decoration: none; font-weight: 600; }
-  .switch-line a:hover { text-decoration: underline; }
-  /* Dashboard */
-  .dash-head { display: flex; justify-content: space-between; align-items: center; margin: 30px 0 18px; flex-wrap: wrap; gap: 10px; }
-  .dash-head h1 { font-family: var(--serif); font-size: 26px; }
-  .quota-bar { display: flex; align-items: center; gap: 10px; font-size: 13.5px; color: var(--ink-soft); }
-  .quota-track { width: 130px; height: 8px; background: var(--paper2); border-radius: 99px; overflow: hidden; border: 1px solid var(--line); }
-  .quota-fill { height: 100%; background: var(--accent); border-radius: 99px; transition: width .3s; }
-  table { width: 100%; border-collapse: collapse; font-size: 13.5px; }
-  th, td { text-align: left; padding: 13px 10px; border-bottom: 1px solid var(--line); vertical-align: middle; }
-  th { color: var(--ink-soft); font-weight: 600; font-size: 12.5px; letter-spacing: .3px; }
-  code { background: var(--paper2); border: 1px solid var(--line); border-radius: 6px; padding: 2px 7px; font-family: var(--mono); font-size: 12.5px; color: var(--ink); }
-  .pill { display: inline-block; font-size: 11.5px; padding: 2px 9px; border-radius: 99px; font-weight: 600; }
-  .pill.ok { background: rgba(21,128,61,.1); color: var(--ok); }
-  .pill.warn { background: rgba(180,83,9,.12); color: var(--warn); }
-  .pill.danger { background: rgba(185,28,28,.1); color: var(--danger); }
-  .empty { text-align: center; color: var(--ink-soft); padding: 34px 0; font-size: 14px; }
-  .actions { display: flex; gap: 8px; }
-  /* availability check */
-  .avail { display: flex; align-items: center; gap: 8px; font-size: 13px; margin: -8px 0 14px; min-height: 22px; }
-  .avail .spinner { width: 14px; height: 14px; border: 2px solid var(--line); border-top-color: var(--accent); border-radius: 50%; animation: spin .7s linear infinite; }
-  .avail.free { color: var(--ok); }
-  .avail.taken { color: var(--danger); }
+  .hero-check input { flex:1; min-width:0; border:none; outline:none; background:transparent; padding:14px 16px; font-size:16px; color:var(--ink); margin:0; }
+  .hero-suffix { font-family: var(--mono); color: var(--ink-soft); font-size:15px; padding-right:12px; white-space:nowrap; }
+  .hero-check .btn { border-radius:0; border:none; border-left:1px solid var(--line); padding:14px 22px; }
+  .hero-avail { justify-content:center; margin:0 0 6px; min-height:26px; font-size:13.5px; }
+  .avail.free { color: var(--ok); font-weight:600; }
+  .avail.taken { color: var(--danger); font-weight:600; }
   .avail.checking { color: var(--ink-soft); }
-  @keyframes spin { to { transform: rotate(360deg); } }
-  /* scroll reveal */
-  .reveal { opacity: 0; transform: translateY(22px); transition: opacity .7s ease, transform .7s ease; }
-  .reveal.in { opacity: 1; transform: none; }
-  /* toast */
-  #toast {
-    position: fixed; top: 76px; left: 50%; transform: translateX(-50%); z-index: 99;
-    padding: 12px 22px; border-radius: 10px; font-size: 14px; opacity: 0; pointer-events: none;
-    transition: opacity .25s; max-width: 90vw; text-align: center; font-weight: 600;
-  }
-  #toast.show { opacity: 1; }
-  #toast.err { background: var(--danger); color: #fff; }
-  #toast.ok { background: var(--ok); color: #fff; }
-  #toast.info { background: var(--ink); color: var(--paper); }
-  .hidden { display: none !important; }
-  .muted { color: var(--ink-soft); }
-  .small { font-size: 12px; }
-  /* 勾选框 + 链接 */
-  .checkbox-line { display: flex; align-items: flex-start; gap: 8px; font-size: 13px; color: var(--ink-soft); margin-bottom: 14px; cursor: pointer; }
-  .checkbox-line input { width: auto; margin: 3px 0 0 0; }
-  .link { color: var(--accent); cursor: pointer; text-decoration: underline; }
-  .link:hover { color: var(--accent-2); }
-  /* 侧边栏布局 */
-  .dash-layout { display: flex; gap: 22px; align-items: flex-start; padding-top: 24px; padding-bottom: 40px; }
-  .sidebar {
-    flex: 0 0 210px; position: sticky; top: 84px;
-    background: var(--card); border: 1px solid var(--line); border-radius: var(--radius);
-    padding: 18px 12px; display: flex; flex-direction: column; gap: 14px;
-  }
-  .side-brand { font-family: var(--serif); font-size: 19px; font-weight: 700; padding: 0 10px; }
+  .hero .cta-row { display:flex; gap:14px; justify-content:center; flex-wrap:wrap; margin-top: 22px; }
+  .stat-row { display:flex; gap:36px; justify-content:center; margin-top: 44px; flex-wrap:wrap; }
+  .stat { border-left:2px solid var(--line); padding-left:16px; text-align:left; }
+  .stat b { display:block; font-family: var(--serif); font-size:28px; color: var(--ink); }
+  .stat span { font-size:13px; color: var(--ink-soft); }
+  section { padding: 52px 0; }
+  section h2 { font-family: var(--serif); font-size:29px; font-weight:700; text-align:center; margin-bottom:36px; letter-spacing:-.3px; }
+  .grid { display:grid; grid-template-columns: repeat(auto-fit, minmax(255px,1fr)); gap:18px; }
+  .card { background: var(--card); border:1px solid var(--line); border-radius: var(--radius); padding:24px; transition: transform .2s, box-shadow .2s; box-shadow:0 1px 2px rgba(28,23,18,.04); }
+  .card:hover { transform: translateY(-4px); box-shadow:0 10px 30px -12px rgba(28,23,18,.18); }
+  .card .icon { font-size:28px; margin-bottom:12px; display:inline-block; }
+  .card h3 { font-family: var(--serif); font-size:18px; margin-bottom:8px; font-weight:700; }
+  .card p { color: var(--ink-soft); font-size:13.5px; }
+  footer { border-top:1px solid var(--line); padding:26px 0 36px; text-align:center; color: var(--ink-soft); font-size:13px; }
+  footer a { color: var(--accent); text-decoration:none; }
+  footer a:hover { text-decoration:underline; }
+  .panel { max-width:460px; margin:40px auto; }
+  .panel .title { font-family: var(--serif); font-size:26px; font-weight:700; text-align:center; margin-bottom:6px; }
+  .panel .subtitle { text-align:center; color: var(--ink-soft); font-size:13.5px; margin-bottom:22px; }
+  .auth-card, .dash-card { background: var(--card); border:1px solid var(--line); border-radius: var(--radius); padding:26px; box-shadow:0 4px 24px -12px rgba(28,23,18,.12); }
+  label { display:block; font-size:13px; color: var(--ink-soft); margin-bottom:6px; }
+  input, select { width:100%; padding:11px 13px; margin-bottom:14px; background:#fff; border:1px solid var(--line); border-radius:9px; color:var(--ink); font-size:14px; }
+  input:focus, select:focus { outline:none; border-color: var(--accent); box-shadow:0 0 0 3px rgba(194,65,12,.12); }
+  .form-row { display:flex; gap:10px; }
+  .form-row .grow { flex:1; }
+  .msg { margin:12px 0; padding:11px 13px; border-radius:8px; font-size:13.5px; display:none; }
+  .msg.show { display:block; }
+  .msg.err { background:rgba(185,28,28,.07); color:var(--danger); border:1px solid rgba(185,28,28,.25); }
+  .msg.ok { background:rgba(21,128,61,.07); color:var(--ok); border:1px solid rgba(21,128,61,.25); }
+  .msg.info { background:rgba(194,65,12,.06); color:var(--accent); border:1px solid rgba(194,65,12,.22); }
+  .switch-line { text-align:center; font-size:13.5px; color: var(--ink-soft); margin-top:16px; }
+  .switch-line a { color: var(--accent); cursor:pointer; text-decoration:none; font-weight:600; }
+  .switch-line a:hover { text-decoration:underline; }
+  .checkbox-line { display:flex; align-items:flex-start; gap:8px; font-size:13px; color:var(--ink-soft); margin-bottom:14px; cursor:pointer; }
+  .checkbox-line input { width:auto; margin:3px 0 0 0; }
+  .link { color: var(--accent); cursor:pointer; text-decoration:underline; }
+  .dash-layout { display:flex; gap:22px; align-items:flex-start; padding:24px 0 40px; }
+  .sidebar { flex:0 0 210px; position:sticky; top:84px; background:var(--card); border:1px solid var(--line); border-radius:var(--radius); padding:18px 12px; display:flex; flex-direction:column; gap:12px; }
+  .side-brand { font-family:var(--serif); font-size:19px; font-weight:700; padding:0 10px; }
   .side-brand .dot { color: var(--accent); }
-  .side-user { font-size: 13px; color: var(--ink-soft); padding: 0 10px; word-break: break-all; line-height: 1.4; border-bottom: 1px solid var(--line); padding-bottom: 12px; }
-  .side-nav { display: flex; flex-direction: column; gap: 4px; }
-  .side-btn {
-    display: block; width: 100%; text-align: left; background: transparent; border: none;
-    padding: 10px 12px; border-radius: 9px; font-size: 14px; color: var(--ink-soft);
-    cursor: pointer; transition: background .15s, color .15s;
-  }
-  .side-btn:hover { background: var(--paper2); color: var(--ink); }
-  .side-btn.active { background: var(--ink); color: var(--paper); font-weight: 600; }
-  .side-foot { margin-top: auto; border-top: 1px solid var(--line); padding-top: 10px; }
+  .side-user { font-size:13px; color:var(--ink-soft); padding:0 10px 12px; border-bottom:1px solid var(--line); word-break:break-all; line-height:1.4; }
+  .side-nav { display:flex; flex-direction:column; gap:4px; }
+  .side-btn { display:block; width:100%; text-align:left; background:transparent; border:none; padding:10px 12px; border-radius:9px; font-size:14px; color:var(--ink-soft); cursor:pointer; transition:background .15s, color .15s; }
+  .side-btn:hover { background:var(--paper2); color:var(--ink); }
+  .side-btn.active { background:var(--ink); color:var(--paper); font-weight:600; }
+  .side-foot { margin-top:auto; border-top:1px solid var(--line); padding-top:10px; }
   #side-logout { color: var(--danger); }
-  .dash-content { flex: 1; min-width: 0; }
-  .dash-panel { display: none; }
-  .dash-panel.active { display: block; animation: fadeIn .3s ease; }
-  @keyframes fadeIn { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: none; } }
-  /* 悬浮窗 */
-  .modal-overlay {
-    position: fixed; inset: 0; z-index: 200; background: rgba(28,23,18,.45);
-    display: flex; align-items: center; justify-content: center; padding: 20px;
-  }
-  .modal-box {
-    background: var(--card); border: 1px solid var(--line); border-radius: var(--radius);
-    max-width: 560px; width: 100%; max-height: 80vh; display: flex; flex-direction: column;
-    box-shadow: 0 20px 60px -20px rgba(28,23,18,.4);
-  }
-  .modal-head { display: flex; align-items: center; justify-content: space-between; padding: 16px 20px; border-bottom: 1px solid var(--line); }
-  .modal-head h3 { font-family: var(--serif); font-size: 18px; }
-  .modal-close { background: transparent; border: none; font-size: 18px; cursor: pointer; color: var(--ink-soft); }
-  .modal-close:hover { color: var(--ink); }
-  .modal-body { padding: 18px 22px; overflow-y: auto; font-size: 13.5px; color: var(--ink-soft); line-height: 1.8; }
-  .modal-body h4 { color: var(--ink); margin: 14px 0 6px; font-size: 14.5px; }
-  .modal-body ul { padding-left: 18px; margin: 6px 0; display: grid; gap: 4px; }
+  .dash-content { flex:1; min-width:0; }
+  .dash-panel { display:none; }
+  .dash-panel.active { display:block; animation: fadeIn .3s ease; }
+  @keyframes fadeIn { from { opacity:0; transform:translateY(6px); } to { opacity:1; transform:none; } }
+  .dash-head { display:flex; justify-content:space-between; align-items:center; margin:0 0 16px; flex-wrap:wrap; gap:10px; }
+  .dash-head h1 { font-family:var(--serif); font-size:24px; }
+  .quota-bar { display:flex; align-items:center; gap:10px; font-size:13.5px; color:var(--ink-soft); }
+  .quota-track { width:130px; height:8px; background:var(--paper2); border-radius:99px; overflow:hidden; border:1px solid var(--line); }
+  .quota-fill { height:100%; background:var(--accent); border-radius:99px; transition:width .3s; }
+  table { width:100%; border-collapse:collapse; font-size:13.5px; }
+  th, td { text-align:left; padding:11px 10px; border-bottom:1px solid var(--line); vertical-align:middle; }
+  th { color:var(--ink-soft); font-weight:600; font-size:12.5px; letter-spacing:.3px; }
+  code { background:var(--paper2); border:1px solid var(--line); border-radius:6px; padding:2px 7px; font-family:var(--mono); font-size:12.5px; color:var(--ink); }
+  .pill { display:inline-block; font-size:11.5px; padding:2px 9px; border-radius:99px; font-weight:600; }
+  .pill.ok { background:rgba(21,128,61,.1); color:var(--ok); }
+  .pill.warn { background:rgba(180,83,9,.12); color:var(--warn); }
+  .pill.danger { background:rgba(185,28,28,.1); color:var(--danger); }
+  .pill.gray { background:rgba(92,83,67,.12); color:var(--ink-soft); }
+  .empty { text-align:center; color:var(--ink-soft); padding:30px 0; font-size:14px; }
+  .slot-card { border:1px solid var(--line); border-radius:12px; padding:16px 18px; margin-bottom:12px; background:#fff; }
+  .slot-head { display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:8px; margin-bottom:8px; }
+  .slot-name { font-family:var(--mono); font-size:15px; font-weight:600; }
+  .slot-meta { font-size:12.5px; color:var(--ink-soft); }
+  .rec-form { display:flex; gap:8px; align-items:center; flex-wrap:wrap; margin-top:10px; padding-top:10px; border-top:1px dashed var(--line); }
+  .rec-form select, .rec-form input { width:auto; margin:0; padding:8px 10px; }
+  .rec-form input { flex:1; min-width:140px; }
+  .modal-overlay { position:fixed; inset:0; z-index:200; background:rgba(28,23,18,.45); display:flex; align-items:center; justify-content:center; padding:20px; }
+  .modal-box { background:var(--card); border:1px solid var(--line); border-radius:var(--radius); max-width:600px; width:100%; max-height:80vh; display:flex; flex-direction:column; box-shadow:0 20px 60px -20px rgba(28,23,18,.4); }
+  .modal-head { display:flex; align-items:center; justify-content:space-between; padding:16px 20px; border-bottom:1px solid var(--line); }
+  .modal-head h3 { font-family:var(--serif); font-size:18px; }
+  .modal-close { background:transparent; border:none; font-size:18px; cursor:pointer; color:var(--ink-soft); }
+  .modal-body { padding:18px 22px; overflow-y:auto; font-size:13.5px; color:var(--ink-soft); line-height:1.8; }
+  .modal-body h4 { color:var(--ink); margin:14px 0 6px; font-size:14.5px; }
+  .modal-body ul { padding-left:18px; margin:6px 0; display:grid; gap:4px; }
+  #toast { position:fixed; top:76px; left:50%; transform:translateX(-50%); z-index:99; padding:12px 22px; border-radius:10px; font-size:14px; opacity:0; pointer-events:none; transition:opacity .25s; max-width:90vw; text-align:center; font-weight:600; }
+  #toast.show { opacity:1; }
+  #toast.err { background:var(--danger); color:#fff; }
+  #toast.ok { background:var(--ok); color:#fff; }
+  #toast.info { background:var(--ink); color:var(--paper); }
+  .hidden { display:none !important; }
+  .muted { color:var(--ink-soft); }
+  .small { font-size:12px; }
+  .reveal { opacity:0; transform:translateY(22px); transition:opacity .7s ease, transform .7s ease; }
+  .reveal.in { opacity:1; transform:none; }
   @media (max-width: 640px) {
-    .hero h1 { font-size: 34px; }
-    .nav-links { display: none; }
-    .form-row { flex-direction: column; gap: 0; }
-    table { font-size: 12.5px; }
-    th:nth-child(4), td:nth-child(4) { display: none; }
-    .dash-layout { flex-direction: column; }
-    .sidebar { position: static; flex: none; width: 100%; flex-direction: column; }
-    .side-nav { flex-direction: row; flex-wrap: wrap; }
-    .side-btn { width: auto; }
-    .side-foot { margin-top: 0; }
+    .hero h1 { font-size:34px; }
+    .nav-links { display:none; }
+    .form-row { flex-direction:column; gap:0; }
+    table { font-size:12.5px; }
+    .dash-layout { flex-direction:column; }
+    .sidebar { position:static; flex:none; width:100%; }
+    .side-nav { flex-direction:row; flex-wrap:wrap; }
+    .side-btn { width:auto; }
+    .side-foot { margin-top:0; }
   }
 </style>
 </head>
@@ -256,78 +160,67 @@
 <canvas id="bg" aria-hidden="true"></canvas>
 <nav>
   <div class="wrap nav-inner">
-    <a class="logo" href="/">fblog<span class="dot">.cyou</span></a>
+    <a class="logo" href="#" id="nav-logo">fblog<span class="dot">.cyou</span></a>
     <div class="nav-links">
-      <a href="#features">功能</a>
-      <a href="#how">如何使用</a>
-      <a href="#rules">使用规则</a>
+      <a data-nav="features">功能</a>
+      <a href="/how">如何使用</a>
+      <a href="/rules">使用规则</a>
     </div>
     <div class="nav-cta" id="nav-cta"></div>
   </div>
 </nav>
 
-<!-- ============ 公开主页 ============ -->
+<!-- 主页 -->
 <div id="view-landing">
   <header class="hero wrap">
     <span class="badge">⚡ 免费 · 注册即用 · 1 年有效期可续期</span>
     <h1>免费二级域名<br><span class="accent">xxx.fblog.cyou</span></h1>
-    <p class="sub">为个人开发者、学习项目、家庭服务器提供免费的二级域名。支持 A / AAAA / CNAME 记录，提交即生效，全球 Cloudflare 节点解析。</p>
+    <p class="sub">为个人开发者、学习项目、家庭服务器提供免费的二级域名。支持 A / AAAA / CNAME 记录与 DDNS 动态解析，全球 Cloudflare 节点加速。</p>
     <div class="hero-check">
       <input id="hero-sub" maxlength="63" placeholder="输入你想要的前缀，例如 myblog" autocomplete="off">
       <span class="hero-suffix">.fblog.cyou</span>
       <button class="btn btn-primary" id="hero-check-btn" type="button">检测可用性</button>
     </div>
     <div class="avail hero-avail" id="hero-avail"></div>
-    <div class="cta-row">
-      <a class="btn btn-primary" href="#" data-goto="register">免费注册</a>
-      <a class="btn" href="#" data-goto="login">登录</a>
-    </div>
     <div class="stat-row">
-      <div class="stat"><b>2 个</b><span>每账号最多子域名</span></div>
-      <div class="stat"><b>1 年</b><span>单个域名有效期</span></div>
-      <div class="stat"><b>6 个月</b><span>可提前续期窗口</span></div>
-      <div class="stat"><b>A/AAAA/CNAME</b><span>支持的记录类型</span></div>
+      <div class="stat"><b id="stat-subs">—</b><span>已注册域名</span></div>
+      <div class="stat"><b id="stat-users">—</b><span>注册用户</span></div>
+      <div class="stat"><b id="stat-days">—</b><span>已运营天数</span></div>
+    </div>
+    <div class="cta-row">
+      <a class="btn btn-primary" data-goto="register">免费注册</a>
+      <a class="btn" data-goto="login">登录</a>
     </div>
   </header>
 
   <section id="features" class="wrap">
     <h2>平台功能</h2>
     <div class="grid">
-      <div class="card"><div class="icon">🆓</div><h3>完全免费</h3><p>注册邮箱即可免费申请子域名，无任何隐藏收费，仅需遵守使用规则。</p></div>
-      <div class="card"><div class="icon">🔍</div><h3>实时可用性检测</h3><p>申请前实时检测前缀是否已被占用，绿色可用红色占用，无需反复试错。</p></div>
-      <div class="card"><div class="icon">🧭</div><h3>多种记录类型</h3><p>支持 A（IPv4）、AAAA（IPv6）、CNAME，覆盖网站、服务、家庭宽带等场景。</p></div>
+      <div class="card"><div class="icon">🆓</div><h3>完全免费</h3><p>邮箱注册即可免费申请二级域名，每个账号最多 5 个卡槽，无隐藏收费。</p></div>
+      <div class="card"><div class="icon">🔍</div><h3>实时可用性检测</h3><p>申请前实时检测前缀是否被占用，绿色可用红色占用。</p></div>
+      <div class="card"><div class="icon">🧭</div><h3>灵活的记录类型</h3><p>申请占用后，随时选择 A / AAAA / CNAME 记录类型并填写目标地址。</p></div>
       <div class="card"><div class="icon">🌐</div><h3>全球解析</h3><p>记录写入 Cloudflare 全球 anycast 网络，低延迟、高可用。</p></div>
-      <div class="card"><div class="icon">⏰</div><h3>1 年有效期 · 可续期</h3><p>域名有效期 1 年，剩余不超过 6 个月时可随时续期；到期未续自动释放。</p></div>
-      <div class="card"><div class="icon">🛡️</div><h3>仅 DNS 模式</h3><p>记录为「灰云」纯解析，服务器与证书由你自主掌控，安全灵活。</p></div>
+      <div class="card"><div class="icon">⏰</div><h3>1 年有效期 · 可续期</h3><p>域名有效期 1 年，剩余不超过 6 个月时可续期；到期未续自动释放。</p></div>
+      <div class="card"><div class="icon">🔄</div><h3>DDNS 动态更新</h3><p>家庭宽带 IP 变化时自动更新，支持路由器与 ddclient。</p></div>
     </div>
   </section>
 
   <section id="how" class="wrap">
     <h2>三步上手</h2>
-    <div class="steps">
-      <div class="step card"><div class="num">1</div><h3>邮箱注册</h3><p>填写邮箱并输入验证码完成注册，30 秒搞定。</p></div>
-      <div class="step card"><div class="num">2</div><h3>申请子域名</h3><p>输入前缀并检测可用性，选择记录类型并填入目标地址。</p></div>
-      <div class="step card"><div class="num">3</div><h3>开始使用</h3><p>1~5 分钟全球生效，随时可修改、删除或续期。</p></div>
+    <div class="grid">
+      <div class="card"><h3>① 邮箱注册</h3><p>填写用户名、邮箱并输入验证码，30 秒完成注册。</p></div>
+      <div class="card"><h3>② 申请占用</h3><p>输入前缀并检测可用性，点击申请即可占用这个二级域名。</p></div>
+      <div class="card"><h3>③ 设置记录</h3><p>在「我的子域名」里为它设置 A/AAAA/CNAME 记录，即可使用。</p></div>
     </div>
+    <p style="text-align:center;margin-top:22px"><a class="link" href="/how">查看详细使用教程 →</a></p>
   </section>
 
-  <section id="rules" class="wrap">
-    <div class="rules">
-      <h3>⚠️ 使用规则</h3>
-      <ul>
-        <li>禁止用于钓鱼、诈骗、盗版、垃圾邮件、赌博等违法或滥用用途；</li>
-        <li>每个账号最多创建 <b>2 个</b>子域名，仅限个人学习与项目使用；</li>
-        <li>子域名默认有效期 <b>1 年</b>，剩余 ≤ 6 个月可续期，到期未续将自动释放；</li>
-        <li>平台管理员有权依据本规则删除违规记录，无需事先通知；</li>
-        <li>滥用举报与申诉请联系平台管理员。</li>
-      </ul>
-    </div>
-  </section>
-
-  <footer class="wrap"></footer>
+  <footer class="wrap">
+    本站已运营 <span id="foot-days">—</span> 天 · <a href="https://esa.fblog.cloud" target="_blank" rel="noopener">访问站长博客 esa.fblog.cloud</a> · <a href="/rules">使用规则</a> · <a href="/terms">用户协议与免责声明</a>
+  </footer>
 </div>
 
-<!-- ============ 登录 ============ -->
+<!-- 登录 -->
 <div id="view-login" class="hidden">
   <div class="panel">
     <div class="title">登录</div>
@@ -347,7 +240,7 @@
   </div>
 </div>
 
-<!-- ============ 注册（两步：邮箱+密码 → 验证码） ============ -->
+<!-- 注册 -->
 <div id="view-register" class="hidden">
   <div class="panel">
     <div class="title">注册账号</div>
@@ -360,10 +253,7 @@
         <input id="reg-email" type="email" autocomplete="email" placeholder="you@example.com" required>
         <label>密码 <span class="small muted">（至少 8 位）</span></label>
         <input id="reg-password" type="password" autocomplete="new-password" required>
-        <label class="checkbox-line">
-          <input type="checkbox" id="reg-agree">
-          <span>我已阅读并同意 <a class="link" data-modal="rules">《使用规则》</a> 与 <a class="link" data-modal="disclaimer">《免责声明》</a></span>
-        </label>
+        <label class="checkbox-line"><input type="checkbox" id="reg-agree"><span>我已阅读并同意 <a class="link" data-modal="rules">《使用规则》</a> 与 <a class="link" data-modal="terms">《用户协议与免责声明》</a></span></label>
         <div id="reg-msg" class="msg"></div>
         <button class="btn btn-primary" style="width:100%" type="submit" id="reg-send-btn">发送验证码</button>
       </form>
@@ -381,7 +271,7 @@
   </div>
 </div>
 
-<!-- ============ 找回密码（两步：邮箱 → 验证码+新密码） ============ -->
+<!-- 找回密码 -->
 <div id="view-forgot" class="hidden">
   <div class="panel">
     <div class="title">找回密码</div>
@@ -409,61 +299,39 @@
   </div>
 </div>
 
-<!-- ============ 仪表盘 ============ -->
+<!-- 仪表盘 -->
 <div id="view-dash" class="hidden">
   <div class="wrap dash-layout">
     <aside class="sidebar">
       <div class="side-brand">fblog<span class="dot">.cyou</span></div>
       <div class="side-user" id="side-user"></div>
       <nav class="side-nav">
-        <button class="side-btn active" data-panel="records">🗂 我的子域名</button>
-        <button class="side-btn" data-panel="create">➕ 申请子域名</button>
+        <button class="side-btn active" data-panel="claim">➕ 申请子域名</button>
+        <button class="side-btn" data-panel="slots">🗂 我的子域名</button>
         <button class="side-btn" data-panel="ddns">🔄 DDNS 管理</button>
         <button class="side-btn" data-panel="account">👤 账号信息</button>
-        <button class="side-btn" data-panel="rules">📜 使用规则</button>
+        <button class="side-btn" data-panel="admin" id="side-admin" style="display:none">🛡 管理后台</button>
       </nav>
       <div class="side-foot">
         <button class="side-btn" id="side-logout">退出登录</button>
       </div>
     </aside>
-
     <main class="dash-content">
-      <div class="dash-panel active" id="panel-records">
-        <div class="dash-head">
-          <h1>我的子域名</h1>
-          <div class="quota-bar"><span>配额</span><div class="quota-track"><div class="quota-fill" id="quota-fill" style="width:0%"></div></div><span id="quota-text">0 / 2</span></div>
-        </div>
+      <div class="dash-panel active" id="panel-claim">
+        <div class="dash-head"><h1>申请子域名</h1><div class="quota-bar"><span>卡槽</span><div class="quota-track"><div class="quota-fill" id="quota-fill" style="width:0%"></div></div><span id="quota-text">0 / 1</span></div></div>
         <div class="dash-card">
-          <div id="records-box"></div>
+          <label>前缀</label>
+          <input id="claim-sub" placeholder="例如 myapp" maxlength="63" required>
+          <div class="avail" id="claim-avail"></div>
+          <div id="claim-msg" class="msg"></div>
+          <button class="btn btn-primary" type="button" id="claim-btn">申请占用</button>
+          <p class="small muted" style="margin-top:12px">申请仅占用前缀，之后在「我的子域名」里设置 A/AAAA/CNAME 记录。第 2 个卡槽需 GitHub 星标（即将开放），第 3-5 个卡槽联系管理员开启。</p>
         </div>
       </div>
 
-      <div class="dash-panel" id="panel-create">
-        <div class="dash-head"><h1>申请子域名</h1></div>
-        <div class="dash-card">
-          <form id="create-form">
-            <div class="form-row">
-              <div class="grow">
-                <label>前缀</label>
-                <input id="create-sub" placeholder="例如 myapp" required>
-                <div class="avail" id="avail-box"></div>
-              </div>
-              <div style="min-width:150px">
-                <label>类型</label>
-                <select id="create-type">
-                  <option value="A">A（IPv4）</option>
-                  <option value="AAAA">AAAA（IPv6）</option>
-                  <option value="CNAME">CNAME</option>
-                </select>
-              </div>
-            </div>
-            <label id="value-label">目标 IPv4</label>
-            <input id="create-value" placeholder="例如 1.2.3.4" required>
-            <div id="create-msg" class="msg"></div>
-            <button class="btn btn-primary" type="submit">创建 / 更新</button>
-            <span class="small muted" style="margin-left:10px">有效期 1 年；相同「前缀+类型」提交 = 更新，不影响到期时间</span>
-          </form>
-        </div>
+      <div class="dash-panel" id="panel-slots">
+        <div class="dash-head"><h1>我的子域名</h1></div>
+        <div id="slots-box"></div>
       </div>
 
       <div class="dash-panel" id="panel-ddns">
@@ -476,32 +344,47 @@
 
       <div class="dash-panel" id="panel-account">
         <div class="dash-head"><h1>账号信息</h1></div>
-        <div class="dash-card" id="account-box"></div>
+        <div class="dash-card">
+          <div id="account-box"></div>
+          <h3 style="margin:20px 0 12px;font-family:var(--serif)">修改密码</h3>
+          <form id="pwd-form">
+            <label>旧密码</label>
+            <input id="pwd-old" type="password" required>
+            <label>新密码 <span class="small muted">（至少 8 位）</span></label>
+            <input id="pwd-new" type="password" required>
+            <div id="pwd-msg" class="msg"></div>
+            <button class="btn btn-primary" type="submit">修改密码</button>
+          </form>
+        </div>
       </div>
 
-      <div class="dash-panel" id="panel-rules">
-        <div class="dash-head"><h1>使用规则</h1></div>
-        <div class="rules">
-          <ul>
-            <li>禁止用于钓鱼、诈骗、盗版、垃圾邮件、赌博等违法或滥用用途；</li>
-            <li>每个账号最多创建 <b>2 个</b>子域名，仅限个人学习与项目使用；</li>
-            <li>子域名默认有效期 <b>1 年</b>，剩余 ≤ 6 个月可续期，到期未续将自动释放；</li>
-            <li>平台管理员有权依据本规则删除违规记录，无需事先通知；</li>
-            <li>滥用举报与申诉请联系平台管理员。</li>
-          </ul>
+      <div class="dash-panel" id="panel-admin">
+        <div class="dash-head"><h1>管理后台</h1></div>
+        <div class="dash-card" style="margin-bottom:16px">
+          <h3 style="margin-bottom:10px;font-family:var(--serif)">所有账户</h3>
+          <div id="admin-users-box"></div>
+        </div>
+        <div class="dash-card" style="margin-bottom:16px">
+          <h3 style="margin-bottom:10px;font-family:var(--serif)">所有二级域名</h3>
+          <div id="admin-slots-box"></div>
+        </div>
+        <div class="dash-card">
+          <h3 style="margin-bottom:10px;font-family:var(--serif)">保留域名</h3>
+          <div class="form-row">
+            <input id="reserved-name" placeholder="例如 www" class="grow">
+            <button class="btn btn-primary" type="button" id="reserved-add">添加保留</button>
+          </div>
+          <div id="reserved-box" style="margin-top:10px"></div>
         </div>
       </div>
     </main>
   </div>
 </div>
 
-<!-- ============ 悬浮窗（规则 / 免责声明） ============ -->
+<!-- 悬浮窗 -->
 <div class="modal-overlay hidden" id="modal-overlay">
   <div class="modal-box">
-    <div class="modal-head">
-      <h3 id="modal-title">使用规则</h3>
-      <button class="modal-close" id="modal-close" type="button">✕</button>
-    </div>
+    <div class="modal-head"><h3 id="modal-title">使用规则</h3><button class="modal-close" id="modal-close" type="button">✕</button></div>
     <div class="modal-body" id="modal-body"></div>
   </div>
 </div>
@@ -512,7 +395,8 @@
 (function () {
   'use strict';
   var $ = function (sel) { return document.querySelector(sel); };
-  var state = { user: null, records: [], rootDomain: 'fblog.cyou', maxSubdomains: 2, checkTimer: null, checkSeq: 0 };
+  var LAUNCH = Date.UTC(2026, 8, 14);
+  var state = { user: null, userEmail: null, role: 'user', slots: [], rootDomain: 'fblog.cyou', maxSlots: 1, checkTimer: null, checkSeq: 0 };
 
   function api(path, opts) {
     opts = opts || {};
@@ -528,17 +412,12 @@
 
   var toastTimer = null;
   function toast(text, type) {
-    var t = $('#toast');
-    t.textContent = text;
-    t.className = 'show ' + (type || 'info');
-    clearTimeout(toastTimer);
-    toastTimer = setTimeout(function () { t.className = ''; }, 3200);
+    var t = $('#toast'); t.textContent = text; t.className = 'show ' + (type || 'info');
+    clearTimeout(toastTimer); toastTimer = setTimeout(function () { t.className = ''; }, 3200);
   }
-
   function showMsg(el, text, type) {
     if (!text) { el.className = 'msg'; el.textContent = ''; return; }
-    el.textContent = text;
-    el.className = 'msg show ' + (type || 'err');
+    el.textContent = text; el.className = 'msg show ' + (type || 'err');
   }
 
   function showView(name) {
@@ -547,647 +426,386 @@
     });
     window.scrollTo(0, 0);
     renderNav();
-    if (name === 'dash') loadAll();
+    if (name === 'dash') loadDash();
+    if (name === 'landing') loadStats();
   }
 
   function renderNav() {
-    var box = $('#nav-cta');
-    box.textContent = '';
+    var box = $('#nav-cta'); box.textContent = '';
     if (state.user) {
-      var who = document.createElement('span');
-      who.className = 'small muted';
-      who.textContent = state.user;
-      var dash = document.createElement('a');
-      dash.className = 'btn btn-sm btn-primary';
-      dash.href = '#';
-      dash.textContent = '仪表盘';
+      var home = document.createElement('a'); home.className = 'btn btn-sm'; home.href = '#'; home.textContent = '首页';
+      home.addEventListener('click', function (e) { e.preventDefault(); showView('landing'); });
+      var dash = document.createElement('a'); dash.className = 'btn btn-sm btn-primary'; dash.href = '#'; dash.textContent = '控制台';
       dash.addEventListener('click', function (e) { e.preventDefault(); showView('dash'); });
-      var out = document.createElement('a');
-      out.className = 'btn btn-sm';
-      out.href = '#';
-      out.textContent = '退出';
-      out.addEventListener('click', function (e) {
-        e.preventDefault();
-        api('/api/logout', { method: 'POST' }).then(function () {
-          state.user = null;
-          showView('landing');
-          toast('已退出登录', 'info');
-        }).catch(function () { showView('landing'); });
-      });
-      box.appendChild(who); box.appendChild(dash); box.appendChild(out);
+      var out = document.createElement('a'); out.className = 'btn btn-sm'; out.href = '#'; out.textContent = '退出';
+      out.addEventListener('click', function (e) { e.preventDefault(); api('/api/logout', { method: 'POST' }).then(function () { state.user = null; state.role = 'user'; showView('landing'); }).catch(function () { showView('landing'); }); });
+      box.appendChild(home); box.appendChild(dash); box.appendChild(out);
     } else {
-      var login = document.createElement('a');
-      login.className = 'btn btn-sm';
-      login.href = '#';
-      login.textContent = '登录';
+      var login = document.createElement('a'); login.className = 'btn btn-sm'; login.href = '#'; login.textContent = '登录';
       login.addEventListener('click', function (e) { e.preventDefault(); showView('login'); });
-      var reg = document.createElement('a');
-      reg.className = 'btn btn-sm btn-primary';
-      reg.href = '#';
-      reg.textContent = '免费注册';
+      var reg = document.createElement('a'); reg.className = 'btn btn-sm btn-primary'; reg.href = '#'; reg.textContent = '免费注册';
       reg.addEventListener('click', function (e) { e.preventDefault(); showView('register'); });
       box.appendChild(login); box.appendChild(reg);
     }
   }
 
-  // ---------- 登录 ----------
+  $('#nav-logo').addEventListener('click', function (e) { e.preventDefault(); showView('landing'); });
+  document.querySelector('[data-nav="features"]').addEventListener('click', function (e) {
+    e.preventDefault(); showView('landing');
+    setTimeout(function () { var el = document.getElementById('features'); if (el) el.scrollIntoView({ behavior: 'smooth' }); }, 60);
+  });
+
+  function loadStats() {
+    var days = Math.max(1, Math.floor((Date.now() - LAUNCH) / 86400000));
+    $('#foot-days').textContent = days;
+    api('/api/stats').then(function (s) {
+      $('#stat-subs').textContent = s.subdomains;
+      $('#stat-users').textContent = s.users;
+      $('#stat-days').textContent = s.days;
+    }).catch(function () {});
+  }
+
+  function heroCheck() {
+    var sub = ($('#hero-sub').value || '').trim().toLowerCase();
+    var box = $('#hero-avail'); box.textContent = '';
+    if (!sub) { box.className = 'avail'; box.textContent = '请输入前缀'; return; }
+    box.className = 'avail checking'; box.textContent = '正在检测…';
+    api('/api/check?subdomain=' + encodeURIComponent(sub)).then(function (data) {
+      box.textContent = '';
+      if (data.available) { box.className = 'avail free'; box.textContent = '✓ ' + data.fqdn + ' 可以使用，注册后即可申请'; }
+      else { box.className = 'avail taken'; box.textContent = '✕ ' + (data.reason || '已被占用'); }
+    }).catch(function (e) { box.textContent = ''; box.className = 'avail'; box.textContent = e.message; });
+  }
+  $('#hero-check-btn').addEventListener('click', heroCheck);
+  $('#hero-sub').addEventListener('keydown', function (ev) { if (ev.key === 'Enter') { ev.preventDefault(); heroCheck(); } });
+
   $('#login-form').addEventListener('submit', function (ev) {
-    ev.preventDefault();
-    var btn = this.querySelector('button');
-    btn.disabled = true;
+    ev.preventDefault(); var btn = this.querySelector('button'); btn.disabled = true;
     api('/api/login', { method: 'POST', body: { username: $('#login-id').value, password: $('#login-password').value } })
-      .then(function (data) {
-        state.user = data.username;
-        showView('dash');
-        toast('欢迎回来，' + data.username + '！', 'ok');
-      })
+      .then(function (d) { state.user = d.username; showView('dash'); toast('欢迎回来，' + d.username + '！', 'ok'); })
       .catch(function (e) { showMsg($('#login-msg'), e.message, 'err'); })
       .finally(function () { btn.disabled = false; });
   });
 
-  // ---------- 注册 ----------
   $('#register-form').addEventListener('submit', function (ev) {
     ev.preventDefault();
-    if (!$('#reg-agree').checked) {
-      showMsg($('#reg-msg'), '请先阅读并勾选同意《使用规则》与《免责声明》', 'err');
-      return;
-    }
-    var btn = $('#reg-send-btn');
-    btn.disabled = true;
+    if (!$('#reg-agree').checked) { showMsg($('#reg-msg'), '请先阅读并勾选同意《使用规则》与《用户协议与免责声明》', 'err'); return; }
+    var btn = $('#reg-send-btn'); btn.disabled = true;
     api('/api/register', { method: 'POST', body: { username: $('#reg-username').value, email: $('#reg-email').value, password: $('#reg-password').value } })
-      .then(function (data) {
-        $('#ver-email').value = data.email || $('#reg-email').value;
-        $('#register-form').classList.add('hidden');
-        $('#verify-form').classList.remove('hidden');
-        $('#reg-switch2').classList.add('hidden');
-        showMsg($('#ver-msg'), '验证码已发送，请查收邮箱（10 分钟内有效）', 'info');
-      })
+      .then(function (d) { $('#ver-email').value = d.email || $('#reg-email').value; $('#register-form').classList.add('hidden'); $('#verify-form').classList.remove('hidden'); $('#reg-switch2').classList.add('hidden'); showMsg($('#ver-msg'), '验证码已发送，请查收邮箱（10 分钟内有效）', 'info'); })
       .catch(function (e) { showMsg($('#reg-msg'), e.message, 'err'); })
       .finally(function () { btn.disabled = false; });
   });
-
   $('#verify-form').addEventListener('submit', function (ev) {
-    ev.preventDefault();
-    var btn = $('#reg-verify-btn');
-    btn.disabled = true;
+    ev.preventDefault(); var btn = $('#reg-verify-btn'); btn.disabled = true;
     api('/api/register/verify', { method: 'POST', body: { email: $('#ver-email').value, code: $('#ver-code').value } })
-      .then(function (data) {
-        state.user = data.username;
-        showView('dash');
-        toast('注册成功，欢迎使用！', 'ok');
-      })
+      .then(function (d) { state.user = d.username; showView('dash'); toast('注册成功，欢迎使用！', 'ok'); })
       .catch(function (e) { showMsg($('#ver-msg'), e.message, 'err'); })
       .finally(function () { btn.disabled = false; });
   });
-
   $('#reg-resend').addEventListener('click', function () {
     api('/api/register', { method: 'POST', body: { username: $('#reg-username').value, email: $('#ver-email').value, password: $('#reg-password').value } })
       .then(function () { showMsg($('#ver-msg'), '验证码已重新发送，请查收', 'info'); })
       .catch(function (e) { showMsg($('#ver-msg'), e.message, 'err'); });
   });
 
-  // ---------- 找回密码 ----------
   $('#forgot-form').addEventListener('submit', function (ev) {
-    ev.preventDefault();
-    var btn = $('#forgot-send-btn');
-    btn.disabled = true;
+    ev.preventDefault(); var btn = $('#forgot-send-btn'); btn.disabled = true;
     api('/api/password/forgot', { method: 'POST', body: { email: $('#forgot-email').value } })
-      .then(function (data) {
-        $('#reset-email').value = data.email || $('#forgot-email').value;
-        $('#forgot-form').classList.add('hidden');
-        $('#reset-form').classList.remove('hidden');
-        $('#forgot-switch2').classList.add('hidden');
-        showMsg($('#reset-msg'), '验证码已发送，请查收邮箱（10 分钟内有效）', 'info');
-      })
+      .then(function (d) { $('#reset-email').value = d.email || $('#forgot-email').value; $('#forgot-form').classList.add('hidden'); $('#reset-form').classList.remove('hidden'); $('#forgot-switch2').classList.add('hidden'); showMsg($('#reset-msg'), '验证码已发送，请查收邮箱', 'info'); })
       .catch(function (e) { showMsg($('#forgot-msg'), e.message, 'err'); })
       .finally(function () { btn.disabled = false; });
   });
-
   $('#reset-form').addEventListener('submit', function (ev) {
-    ev.preventDefault();
-    var btn = $('#reset-btn');
-    btn.disabled = true;
+    ev.preventDefault(); var btn = $('#reset-btn'); btn.disabled = true;
     api('/api/password/reset', { method: 'POST', body: { email: $('#reset-email').value, code: $('#reset-code').value, password: $('#reset-password').value } })
-      .then(function (data) {
-        state.user = null;
-        showView('login');
-        toast('密码已重置，请用新密码登录', 'ok');
-      })
+      .then(function () { state.user = null; showView('login'); toast('密码已重置，请用新密码登录', 'ok'); })
       .catch(function (e) { showMsg($('#reset-msg'), e.message, 'err'); })
       .finally(function () { btn.disabled = false; });
   });
-
   $('#forgot-resend').addEventListener('click', function () {
     api('/api/password/forgot', { method: 'POST', body: { email: $('#reset-email').value } })
       .then(function () { showMsg($('#reset-msg'), '验证码已重新发送，请查收', 'info'); })
       .catch(function (e) { showMsg($('#reset-msg'), e.message, 'err'); });
   });
 
-  // ---------- 仪表盘数据 ----------
-  function loadAll() {
+  function loadDash() {
     api('/api/me').then(function (m) {
-      state.user = m.username;
-      state.userEmail = m.email;
-      state.rootDomain = m.rootDomain;
-      state.maxSubdomains = m.maxSubdomains;
-      state.usedSubdomains = m.usedSubdomains || 0;
-      renderSideUser();
-      renderAccount();
-    }).catch(function (e) {
-      if (String(e.message).indexOf('登录') !== -1) { state.user = null; showView('landing'); }
-    });
+      state.user = m.username; state.userEmail = m.email; state.role = m.role;
+      state.rootDomain = m.rootDomain; state.maxSlots = m.maxSlots;
+      $('#quota-fill').style.width = Math.min(100, (m.usedSlots || 0) / m.maxSlots * 100) + '%';
+      $('#quota-text').textContent = (m.usedSlots || 0) + ' / ' + m.maxSlots;
+      $('#side-user').textContent = m.username + (m.email ? ' · ' + m.email : '');
+      $('#side-admin').style.display = (m.role === 'admin') ? '' : 'none';
+      renderAccount(m);
+    }).catch(function (e) { if (String(e.message).indexOf('登录') !== -1) { state.user = null; showView('landing'); } });
 
-    api('/api/records').then(function (data) {
-      state.records = data.records || [];
-      state.rootDomain = data.rootDomain;
-      var max = data.maxSubdomains || 2;
-      $('#quota-fill').style.width = Math.min(100, state.records.length / max * 100) + '%';
-      $('#quota-text').textContent = state.records.length + ' / ' + max;
-      renderRecords();
-      renderDDNS();
+    api('/api/slots').then(function (d) {
+      state.slots = d.slots || [];
+      renderSlots(); renderDDNS();
     }).catch(function () {});
   }
 
-  function renderSideUser() {
-    var el = $('#side-user');
-    el.textContent = '';
-    var b = document.createElement('div');
-    b.style.cssText = 'font-weight:600;color:var(--ink)';
-    b.textContent = state.user;
-    el.appendChild(b);
-    if (state.userEmail) {
-      var span = document.createElement('div');
-      span.className = 'small';
-      span.textContent = state.userEmail;
-      el.appendChild(span);
-    }
-  }
-
-  function renderAccount() {
-    var box = $('#account-box');
-    box.textContent = '';
-    var rows = [
-      ['用户名', state.user || '-'],
-      ['邮箱', state.userEmail || '未绑定邮箱'],
-      ['子域名配额', (state.usedSubdomains || 0) + ' / ' + state.maxSubdomains]
-    ];
-    var table = document.createElement('table');
-    rows.forEach(function (row) {
-      var tr = document.createElement('tr');
-      var th = document.createElement('th');
-      th.style.width = '120px';
-      th.textContent = row[0];
-      var td = document.createElement('td');
-      td.textContent = row[1];
-      tr.appendChild(th); tr.appendChild(td);
-      table.appendChild(tr);
+  function renderAccount(m) {
+    var box = $('#account-box'); box.textContent = '';
+    var rows = [['用户名', m.username], ['邮箱', m.email || '未绑定'], ['角色', m.role === 'admin' ? '管理员' : '普通用户'], ['卡槽', (m.usedSlots || 0) + ' / ' + m.maxSlots]];
+    var t = document.createElement('table');
+    rows.forEach(function (r) {
+      var tr = document.createElement('tr'); var th = document.createElement('th'); th.style.width = '110px'; th.textContent = r[0];
+      var td = document.createElement('td'); td.textContent = r[1]; tr.appendChild(th); tr.appendChild(td); t.appendChild(tr);
     });
-    box.appendChild(table);
-    var hint = document.createElement('p');
-    hint.className = 'muted small';
-    hint.style.marginTop = '14px';
-    hint.textContent = '如需修改密码，可退出后通过「忘记密码」重置。';
-    box.appendChild(hint);
+    box.appendChild(t);
   }
 
-  function fmtDate(ts) {
-    if (!ts) return '-';
-    var d = new Date(ts);
-    return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0');
-  }
-
-  function renderRecords() {
-    var box = $('#records-box');
-    box.textContent = '';
-    if (!state.records.length) {
-      var e = document.createElement('div');
-      e.className = 'empty';
-      e.textContent = '还没有子域名，到「申请子域名」创建一个吧。';
-      box.appendChild(e);
-      return;
-    }
-    var table = document.createElement('table');
-    var thead = document.createElement('thead');
-    thead.innerHTML = '<tr><th>子域名</th><th>类型</th><th>值</th><th>到期时间</th><th>状态</th><th>操作</th></tr>';
-    table.appendChild(thead);
-    var tbody = document.createElement('tbody');
-    state.records.forEach(function (r) {
-      var tr = document.createElement('tr');
-
-      var tdName = document.createElement('td');
-      var code = document.createElement('code');
-      code.textContent = r.subdomain + '.' + state.rootDomain;
-      tdName.appendChild(code);
-
-      var tdType = document.createElement('td');
-      tdType.textContent = r.type;
-
-      var tdVal = document.createElement('td');
-      var vcode = document.createElement('code');
-      vcode.textContent = r.value;
-      tdVal.appendChild(vcode);
-
-      var tdExp = document.createElement('td');
-      tdExp.className = 'small muted';
-      tdExp.textContent = fmtDate(r.expires_at) + '（剩 ' + r.days_remaining + ' 天）';
-
-      var tdStatus = document.createElement('td');
-      var pill = document.createElement('span');
-      pill.className = 'pill ' + (r.expired ? 'danger' : r.renewable ? 'warn' : 'ok');
-      pill.textContent = r.expired ? '已过期' : r.renewable ? '可续期' : '正常';
-      tdStatus.appendChild(pill);
-
-      var tdOps = document.createElement('td');
-      var ops = document.createElement('div');
-      ops.className = 'actions';
-      if (r.renewable && !r.expired) {
-        var renew = document.createElement('button');
-        renew.type = 'button';
-        renew.className = 'btn btn-sm';
-        renew.textContent = '续期 1 年';
-        renew.addEventListener('click', function () { renewRecord(r); });
-        ops.appendChild(renew);
-      }
-      var del = document.createElement('button');
-      del.type = 'button';
-      del.className = 'btn btn-sm btn-danger';
-      del.textContent = '删除';
-      del.addEventListener('click', function () { removeRecord(r); });
-      ops.appendChild(del);
-      tdOps.appendChild(ops);
-
-      tr.appendChild(tdName); tr.appendChild(tdType); tr.appendChild(tdVal);
-      tr.appendChild(tdExp); tr.appendChild(tdStatus); tr.appendChild(tdOps);
-      tbody.appendChild(tr);
-    });
-    table.appendChild(tbody);
-    box.appendChild(table);
-  }
-
-  function copyText(text, okMsg) {
-    if (navigator.clipboard && navigator.clipboard.writeText) {
-      navigator.clipboard.writeText(text).then(function () { toast(okMsg || '已复制', 'ok'); }, function () { toast('复制失败，请手动选择复制', 'err'); });
-    } else {
-      var ta = document.createElement('textarea');
-      ta.value = text;
-      document.body.appendChild(ta);
-      ta.select();
-      try { document.execCommand('copy'); toast(okMsg || '已复制', 'ok'); } catch (e) { toast('复制失败', 'err'); }
-      document.body.removeChild(ta);
-    }
-  }
-
-  function renderDDNS() {
-    var box = $('#ddns-box');
-    box.textContent = '';
-    if (!state.records.length) {
-      var e = document.createElement('div');
-      e.className = 'empty';
-      e.textContent = '还没有子域名，创建后可在此获取 DDNS 更新地址。';
-      box.appendChild(e);
-      return;
-    }
-    state.records.forEach(function (r) {
-      var wrap = document.createElement('div');
-      wrap.style.cssText = 'display:flex;align-items:center;gap:8px;margin:10px 0;flex-wrap:wrap';
-      var name = document.createElement('code');
-      name.textContent = r.subdomain + '.' + state.rootDomain;
-      var url = document.createElement('code');
-      url.style.cssText = 'flex:1;min-width:220px;word-break:break-all';
-      url.textContent = '/api/ddns?token=' + (r.ddns_token || '') + '&ip=';
-      var copy = document.createElement('button');
-      copy.type = 'button';
-      copy.className = 'btn btn-sm';
-      copy.textContent = '复制';
-      copy.addEventListener('click', function () { copyText(location.origin + url.textContent, 'DDNS 地址已复制'); });
-      var regen = document.createElement('button');
-      regen.type = 'button';
-      regen.className = 'btn btn-sm';
-      regen.textContent = '重置令牌';
-      regen.addEventListener('click', function () { regenDDNS(r); });
-      wrap.appendChild(name); wrap.appendChild(url); wrap.appendChild(copy); wrap.appendChild(regen);
-      box.appendChild(wrap);
-    });
-  }
-
-  function regenDDNS(r) {
-    if (!window.confirm('确定重置 ' + r.subdomain + '.' + state.rootDomain + ' 的 DDNS 令牌吗？旧地址将立即失效。')) return;
-    api('/api/records/' + r.id + '/ddns-token', { method: 'POST' })
-      .then(function (data) {
-        toast('令牌已重置', 'ok');
-        loadAll();
-      })
-      .catch(function (e) { toast(e.message, 'err'); });
-  }
-
-  function renewRecord(r) {
-    api('/api/records/' + r.id + '/renew', { method: 'POST' })
-      .then(function () {
-        toast(r.subdomain + '.' + state.rootDomain + ' 已续期 1 年（新到期：' + fmtDate(r.expires_at + 31536000000) + '）', 'ok');
-        loadAll();
-      })
-      .catch(function (e) { toast(e.message, 'err'); });
-  }
-
-  function removeRecord(r) {
-    if (!window.confirm('确定删除 ' + r.subdomain + '.' + state.rootDomain + ' 吗？删除后将释放该前缀。')) return;
-    api('/api/records/' + r.id, { method: 'DELETE' })
-      .then(function () { toast('已删除', 'ok'); loadAll(); })
-      .catch(function (e) { toast(e.message, 'err'); });
-  }
-
-  // ---------- 创建 + 可用性检测 ----------
-  function checkAvailability(sub) {
-    var seq = ++state.checkSeq;
-    var box = $('#avail-box');
-    box.textContent = '';
-    var sp = document.createElement('div');
-    sp.className = 'spinner';
-    box.appendChild(sp);
-    box.appendChild(document.createTextNode(' 正在检测…'));
-    box.className = 'avail checking';
-
-    api('/api/records/check?subdomain=' + encodeURIComponent(sub))
-      .then(function (data) {
-        if (seq !== state.checkSeq) return;
-        box.textContent = '';
-        if (data.available) {
-          box.className = 'avail free';
-          box.textContent = '✓ ' + data.fqdn + ' 可以使用';
-        } else {
-          box.className = 'avail taken';
-          box.textContent = '✕ ' + (data.reason || '已被占用');
-        }
-      })
-      .catch(function (e) {
-        if (seq !== state.checkSeq) return;
-        box.textContent = '';
-        box.className = 'avail';
-        box.textContent = e.message;
-      });
-  }
-
-  $('#create-sub').addEventListener('input', function () {
-    var sub = this.value.trim().toLowerCase();
-    clearTimeout(state.checkTimer);
-    if (!sub) {
-      state.checkSeq++;
-      var box = $('#avail-box');
-      box.textContent = '';
-      box.className = 'avail';
-      return;
-    }
-    state.checkTimer = setTimeout(function () { checkAvailability(sub); }, 400);
-  });
-
-  // 主页 hero 检测按钮（游客可用）
-  function heroCheck() {
-    var sub = ($('#hero-sub').value || '').trim().toLowerCase();
-    var box = $('#hero-avail');
-    box.textContent = '';
+  function claimCheck() {
+    var sub = ($('#claim-sub').value || '').trim().toLowerCase();
+    var box = $('#claim-avail'); box.textContent = '';
     if (!sub) { box.className = 'avail'; box.textContent = '请输入前缀'; return; }
-    var sp = document.createElement('div');
-    sp.className = 'spinner';
-    box.appendChild(sp);
-    box.appendChild(document.createTextNode(' 正在检测…'));
-    box.className = 'avail checking';
-    api('/api/records/check?subdomain=' + encodeURIComponent(sub))
-      .then(function (data) {
-        box.textContent = '';
-        if (data.available) {
-          box.className = 'avail hero-avail free';
-          box.textContent = '✓ ' + data.fqdn + ' 可以使用，注册后即可申请';
-        } else {
-          box.className = 'avail hero-avail taken';
-          box.textContent = '✕ ' + (data.reason || '已被占用');
-        }
-      })
-      .catch(function (e) {
-        box.textContent = '';
-        box.className = 'avail hero-avail';
-        box.textContent = e.message;
-      });
+    box.className = 'avail checking'; box.textContent = '正在检测…';
+    api('/api/check?subdomain=' + encodeURIComponent(sub)).then(function (data) {
+      box.textContent = '';
+      if (data.available) { box.className = 'avail free'; box.textContent = '✓ ' + data.fqdn + ' 可以使用'; }
+      else { box.className = 'avail taken'; box.textContent = '✕ ' + (data.reason || '已被占用'); }
+    }).catch(function (e) { box.textContent = ''; box.className = 'avail'; box.textContent = e.message; });
   }
-  $('#hero-check-btn').addEventListener('click', heroCheck);
-  $('#hero-sub').addEventListener('keydown', function (ev) {
-    if (ev.key === 'Enter') { ev.preventDefault(); heroCheck(); }
+  $('#claim-sub').addEventListener('input', function () {
+    clearTimeout(state.checkTimer);
+    var sub = this.value.trim().toLowerCase();
+    if (!sub) { state.checkSeq++; $('#claim-avail').textContent = ''; $('#claim-avail').className = 'avail'; return; }
+    state.checkTimer = setTimeout(claimCheck, 400);
   });
-
-  $('#create-type').addEventListener('change', function () {
-    var t = this.value;
-    var label = $('#value-label');
-    var input = $('#create-value');
-    if (t === 'A') { label.textContent = '目标 IPv4'; input.placeholder = '例如 1.2.3.4'; }
-    else if (t === 'AAAA') { label.textContent = '目标 IPv6'; input.placeholder = '例如 2001:db8::1'; }
-    else { label.textContent = '目标域名（CNAME）'; input.placeholder = '例如 example.com'; }
-  });
-
-  $('#create-form').addEventListener('submit', function (ev) {
-    ev.preventDefault();
-    var btn = this.querySelector('button[type=submit]');
-    btn.disabled = true;
-    api('/api/records', {
-      method: 'POST',
-      body: { subdomain: $('#create-sub').value, type: $('#create-type').value, value: $('#create-value').value }
-    }).then(function (data) {
-      toast('成功：' + data.fqdn + ' → ' + data.type + ' ' + data.value + '（有效期 1 年）', 'ok');
-      $('#create-sub').value = '';
-      $('#create-value').value = '';
-      $('#avail-box').textContent = '';
-      $('#avail-box').className = 'avail';
-      loadAll();
-    }).catch(function (e) { showMsg($('#create-msg'), e.message, 'err'); })
+  $('#claim-btn').addEventListener('click', function () {
+    var name = ($('#claim-sub').value || '').trim().toLowerCase();
+    var btn = this; btn.disabled = true;
+    api('/api/slots', { method: 'POST', body: { name: name } })
+      .then(function (d) { toast('已占用 ' + d.name + '.' + state.rootDomain + '，去「我的子域名」设置记录吧', 'ok'); $('#claim-sub').value = ''; $('#claim-avail').textContent = ''; $('#claim-avail').className = 'avail'; loadDash(); })
+      .catch(function (e) { showMsg($('#claim-msg'), e.message, 'err'); })
       .finally(function () { btn.disabled = false; });
   });
 
-  // ---------- 视图切换 ----------
-  document.addEventListener('click', function (e) {
-    var t = e.target;
-    var target = null;
-    while (t && t !== document) {
-      if (t.hasAttribute && t.hasAttribute('data-goto')) { target = t; break; }
-      t = t.parentNode;
-    }
-    if (target) {
-      e.preventDefault();
-      var v = target.getAttribute('data-goto');
-      if (v === 'register') {
-        showMsg($('#reg-msg'), '', '');
-        $('#register-form').classList.remove('hidden');
-        $('#verify-form').classList.add('hidden');
-        $('#reg-switch2').classList.remove('hidden');
+  function fmtDate(ts) { if (!ts) return '-'; var d = new Date(ts); return d.getFullYear() + '-' + String(d.getMonth()+1).padStart(2,'0') + '-' + String(d.getDate()).padStart(2,'0'); }
+  function renderSlots() {
+    var box = $('#slots-box'); box.textContent = '';
+    if (!state.slots.length) { var e = document.createElement('div'); e.className = 'empty'; e.textContent = '还没有子域名，到「申请子域名」占用一个吧。'; box.appendChild(e); return; }
+    state.slots.forEach(function (s) {
+      var card = document.createElement('div'); card.className = 'slot-card';
+      var head = document.createElement('div'); head.className = 'slot-head';
+      var name = document.createElement('span'); name.className = 'slot-name'; name.textContent = s.name + '.' + state.rootDomain;
+      var pill = document.createElement('span');
+      pill.className = 'pill ' + (s.expired ? 'danger' : s.record ? 'ok' : 'gray');
+      pill.textContent = s.expired ? '已过期' : s.record ? '已使用 · ' + s.record.type : '未使用';
+      head.appendChild(name); head.appendChild(pill);
+      var meta = document.createElement('div'); meta.className = 'slot-meta';
+      meta.textContent = '到期 ' + fmtDate(s.expires_at) + '（剩 ' + s.days_remaining + ' 天）' + (s.record ? ' · 值 ' + s.record.value : '');
+      card.appendChild(head); card.appendChild(meta);
+
+      var rf = document.createElement('div'); rf.className = 'rec-form';
+      var sel = document.createElement('select');
+      ['A', 'AAAA', 'CNAME'].forEach(function (t) { var o = document.createElement('option'); o.value = t; o.textContent = t; if (s.record && s.record.type === t) o.selected = true; sel.appendChild(o); });
+      var vin = document.createElement('input'); vin.placeholder = '例如 1.2.3.4 或 example.com'; vin.value = s.record ? s.record.value : '';
+      var setBtn = document.createElement('button'); setBtn.className = 'btn btn-sm btn-primary'; setBtn.type = 'button'; setBtn.textContent = s.record ? '更新记录' : '设置记录';
+      setBtn.addEventListener('click', function () {
+        setBtn.disabled = true;
+        api('/api/slots/' + s.id + '/record', { method: 'POST', body: { type: sel.value, value: vin.value } })
+          .then(function () { toast('记录已设置', 'ok'); loadDash(); })
+          .catch(function (e) { toast(e.message, 'err'); setBtn.disabled = false; });
+      });
+      var delBtn = document.createElement('button'); delBtn.className = 'btn btn-sm btn-danger'; delBtn.type = 'button'; delBtn.textContent = '释放';
+      delBtn.addEventListener('click', function () {
+        if (!window.confirm('确定释放 ' + s.name + '.' + state.rootDomain + ' 吗？')) return;
+        api('/api/slots/' + s.id, { method: 'DELETE' }).then(function () { toast('已释放', 'ok'); loadDash(); }).catch(function (e) { toast(e.message, 'err'); });
+      });
+      rf.appendChild(sel); rf.appendChild(vin); rf.appendChild(setBtn); rf.appendChild(delBtn);
+
+      if (s.renewable && !s.expired) {
+        var renew = document.createElement('button'); renew.className = 'btn btn-sm'; renew.type = 'button'; renew.textContent = '续期 1 年';
+        renew.addEventListener('click', function () { api('/api/slots/' + s.id + '/renew', { method: 'POST' }).then(function () { toast('已续期', 'ok'); loadDash(); }).catch(function (e) { toast(e.message, 'err'); }); });
+        rf.appendChild(renew);
       }
-      if (v === 'forgot') {
-        showMsg($('#forgot-msg'), '', '');
-        $('#forgot-form').classList.remove('hidden');
-        $('#reset-form').classList.add('hidden');
-        $('#forgot-switch2').classList.remove('hidden');
-      }
-      showView(v);
-    }
+      card.appendChild(rf); box.appendChild(card);
+    });
+  }
+
+  function copyText(text, okMsg) {
+    if (navigator.clipboard && navigator.clipboard.writeText) { navigator.clipboard.writeText(text).then(function () { toast(okMsg || '已复制', 'ok'); }, function () { toast('复制失败', 'err'); }); }
+    else { var ta = document.createElement('textarea'); ta.value = text; document.body.appendChild(ta); ta.select(); try { document.execCommand('copy'); toast(okMsg || '已复制', 'ok'); } catch (e) {} document.body.removeChild(ta); }
+  }
+  function renderDDNS() {
+    var box = $('#ddns-box'); box.textContent = '';
+    if (!state.slots.length) { var e = document.createElement('div'); e.className = 'empty'; e.textContent = '还没有子域名。'; box.appendChild(e); return; }
+    state.slots.forEach(function (s) {
+      var wrap = document.createElement('div'); wrap.style.cssText = 'display:flex;align-items:center;gap:8px;margin:10px 0;flex-wrap:wrap';
+      var name = document.createElement('code'); name.textContent = s.name + '.' + state.rootDomain;
+      var url = document.createElement('code'); url.style.cssText = 'flex:1;min-width:200px;word-break:break-all'; url.textContent = '/api/ddns?token=' + (s.ddns_token || '') + '&ip=';
+      var copy = document.createElement('button'); copy.type = 'button'; copy.className = 'btn btn-sm'; copy.textContent = '复制'; copy.addEventListener('click', function () { copyText(location.origin + url.textContent, 'DDNS 地址已复制'); });
+      var regen = document.createElement('button'); regen.type = 'button'; regen.className = 'btn btn-sm'; regen.textContent = '重置令牌'; regen.addEventListener('click', function () { if (!window.confirm('确定重置令牌吗？旧地址将失效。')) return; api('/api/slots/' + s.id + '/ddns-token', { method: 'POST' }).then(function () { toast('已重置', 'ok'); loadDash(); }).catch(function (e) { toast(e.message, 'err'); }); });
+      wrap.appendChild(name); wrap.appendChild(url); wrap.appendChild(copy); wrap.appendChild(regen); box.appendChild(wrap);
+    });
+  }
+
+  $('#pwd-form').addEventListener('submit', function (ev) {
+    ev.preventDefault(); var btn = this.querySelector('button'); btn.disabled = true;
+    api('/api/password/change', { method: 'POST', body: { oldPassword: $('#pwd-old').value, newPassword: $('#pwd-new').value } })
+      .then(function () { toast('密码已修改', 'ok'); $('#pwd-old').value = ''; $('#pwd-new').value = ''; })
+      .catch(function (e) { showMsg($('#pwd-msg'), e.message, 'err'); })
+      .finally(function () { btn.disabled = false; });
   });
 
-  // ---------- 侧边栏切换 ----------
+  function loadAdmin() {
+    if (state.role !== 'admin') return;
+    api('/api/admin/users').then(function (d) { renderAdminUsers(d.users); }).catch(function () {});
+    api('/api/admin/slots').then(function (d) { renderAdminSlots(d.slots); }).catch(function () {});
+    api('/api/admin/reserved').then(function (d) { renderReserved(d.reserved); }).catch(function () {});
+  }
+  function renderAdminUsers(users) {
+    var box = $('#admin-users-box'); box.textContent = '';
+    var t = document.createElement('table');
+    t.innerHTML = '<thead><tr><th>ID</th><th>用户名</th><th>邮箱</th><th>角色</th><th>卡槽</th><th>操作</th></tr></thead>';
+    var tb = document.createElement('tbody');
+    users.forEach(function (u) {
+      var tr = document.createElement('tr');
+      var td1 = document.createElement('td'); td1.textContent = u.id;
+      var td2 = document.createElement('td'); td2.textContent = u.username;
+      var td3 = document.createElement('td'); td3.textContent = u.email || '-';
+      var td4 = document.createElement('td'); td4.textContent = u.role === 'admin' ? '管理员' : '用户';
+      var td5 = document.createElement('td'); td5.textContent = (u.slot_count || 0) + '（星标:' + (u.github_star ? '是' : '否') + ' 额外:' + u.slots_extra + '）';
+      var td6 = document.createElement('td');
+      var roleBtn = document.createElement('button'); roleBtn.className = 'btn btn-sm'; roleBtn.type = 'button'; roleBtn.textContent = u.role === 'admin' ? '取消管理员' : '设为管理员';
+      roleBtn.addEventListener('click', function () { api('/api/admin/users/' + u.id + '/role', { method: 'POST', body: { role: u.role === 'admin' ? 'user' : 'admin' } }).then(function () { loadAdmin(); }).catch(function (e) { toast(e.message, 'err'); }); });
+      var slotBtn = document.createElement('button'); slotBtn.className = 'btn btn-sm'; slotBtn.type = 'button'; slotBtn.textContent = '开卡槽';
+      slotBtn.addEventListener('click', function () {
+        var extra = prompt('授予额外卡槽数量（0-4）？', String(u.slots_extra || 0));
+        if (extra === null) return;
+        var e2 = parseInt(extra, 10); if (isNaN(e2)) e2 = 0;
+        var star = window.confirm('是否标记该用户已完成 GitHub 星标（解锁第 2 个卡槽）？');
+        api('/api/admin/users/' + u.id + '/slots', { method: 'POST', body: { extra: e2, githubStar: star } }).then(function () { loadAdmin(); }).catch(function (e) { toast(e.message, 'err'); });
+      });
+      td6.appendChild(roleBtn); td6.appendChild(slotBtn);
+      tr.appendChild(td1); tr.appendChild(td2); tr.appendChild(td3); tr.appendChild(td4); tr.appendChild(td5); tr.appendChild(td6);
+      tb.appendChild(tr);
+    });
+    t.appendChild(tb); box.appendChild(t);
+  }
+  function renderAdminSlots(slots) {
+    var box = $('#admin-slots-box'); box.textContent = '';
+    var t = document.createElement('table');
+    t.innerHTML = '<thead><tr><th>域名</th><th>所有者</th><th>记录</th><th>到期</th><th>操作</th></tr></thead>';
+    var tb = document.createElement('tbody');
+    slots.forEach(function (s) {
+      var tr = document.createElement('tr');
+      var td1 = document.createElement('td'); var c = document.createElement('code'); c.textContent = s.name + '.fblog.cyou'; td1.appendChild(c);
+      var td2 = document.createElement('td'); td2.textContent = s.username + (s.email ? ' / ' + s.email : '');
+      var td3 = document.createElement('td'); td3.textContent = s.type ? s.type + ' → ' + s.value : '未使用';
+      var td4 = document.createElement('td'); td4.className = 'small muted'; td4.textContent = fmtDate(s.expires_at);
+      var td5 = document.createElement('td');
+      var del = document.createElement('button'); del.className = 'btn btn-sm btn-danger'; del.type = 'button'; del.textContent = '回收';
+      del.addEventListener('click', function () { if (!window.confirm('确定回收 ' + s.name + '.fblog.cyou 吗？')) return; api('/api/slots/' + s.id, { method: 'DELETE' }).then(function () { loadAdmin(); }).catch(function (e) { toast(e.message, 'err'); }); });
+      td5.appendChild(del);
+      tr.appendChild(td1); tr.appendChild(td2); tr.appendChild(td3); tr.appendChild(td4); tr.appendChild(td5);
+      tb.appendChild(tr);
+    });
+    t.appendChild(tb); box.appendChild(t);
+  }
+  function renderReserved(list) {
+    var box = $('#reserved-box'); box.textContent = '';
+    if (!list.length) { box.textContent = '暂无保留域名'; return; }
+    list.forEach(function (r) {
+      var span = document.createElement('span'); span.className = 'pill gray'; span.style.margin = '4px'; span.style.cursor = 'pointer';
+      span.textContent = r.name + ' ✕';
+      span.addEventListener('click', function () { api('/api/admin/reserved/' + encodeURIComponent(r.name), { method: 'DELETE' }).then(function () { loadAdmin(); }).catch(function (e) { toast(e.message, 'err'); }); });
+      box.appendChild(span);
+    });
+  }
+  $('#reserved-add').addEventListener('click', function () {
+    var name = ($('#reserved-name').value || '').trim().toLowerCase();
+    if (!name) return;
+    api('/api/admin/reserved', { method: 'POST', body: { name: name } }).then(function () { $('#reserved-name').value = ''; loadAdmin(); }).catch(function (e) { toast(e.message, 'err'); });
+  });
+
   document.querySelectorAll('.side-btn[data-panel]').forEach(function (btn) {
     btn.addEventListener('click', function () {
       document.querySelectorAll('.side-btn[data-panel]').forEach(function (b) { b.classList.remove('active'); });
       btn.classList.add('active');
       var panel = btn.getAttribute('data-panel');
       document.querySelectorAll('.dash-panel').forEach(function (p) { p.classList.remove('active'); });
-      var target = document.getElementById('panel-' + panel);
-      if (target) target.classList.add('active');
+      var target = document.getElementById('panel-' + panel); if (target) target.classList.add('active');
+      if (panel === 'admin') loadAdmin();
     });
   });
-
-  // ---------- 侧边栏退出 ----------
   $('#side-logout').addEventListener('click', function () {
-    api('/api/logout', { method: 'POST' }).then(function () {
-      state.user = null; state.userEmail = null;
-      showView('landing');
-      toast('已退出登录', 'info');
-    }).catch(function () { showView('landing'); });
+    api('/api/logout', { method: 'POST' }).then(function () { state.user = null; state.role = 'user'; showView('landing'); }).catch(function () { showView('landing'); });
   });
 
-  // ---------- 悬浮窗（使用规则 / 免责声明） ----------
   var MODAL_CONTENT = {
-    rules: '<h4>平台使用规则</h4><ul>' +
-      '<li>禁止用于钓鱼、诈骗、盗版、垃圾邮件、赌博等违法或滥用用途；</li>' +
-      '<li>每个账号最多创建 2 个子域名，仅限个人学习与项目使用；</li>' +
-      '<li>子域名默认有效期 1 年，剩余 ≤ 6 个月可续期，到期未续将自动释放；</li>' +
-      '<li>平台管理员有权依据本规则删除违规记录，无需事先通知；</li>' +
-      '<li>滥用举报与申诉请联系平台管理员。</li>' +
-      '</ul>',
-    disclaimer: '<h4>免责声明</h4>' +
-      '<p>本平台为免费个人服务，不对服务的可用性、连续性、安全性作任何明示或默示的保证。</p>' +
-      '<p>用户须对通过本平台创建的子域名下的全部内容与行为自行负责；因用户滥用导致的删除、封禁或域名释放，平台不承担任何责任。</p>' +
-      '<p>域名解析基于 Cloudflare 基础设施，相关服务受 Cloudflare 服务条款约束。</p>' +
-      '<p>平台保留随时调整服务规则与功能的权利。</p>'
+    rules: '<h4>平台使用规则</h4><ul><li>禁止用于钓鱼、诈骗、盗版、垃圾邮件、赌博等违法或滥用用途；</li><li>每个账号默认 1 个卡槽，最多 5 个，仅限个人学习与项目使用；</li><li>二级域名默认有效期 1 年，剩余 ≤ 6 个月可续期，到期未续将自动释放；</li><li>平台管理员有权依据本规则回收违规域名，无需事先通知。</li></ul>',
+    terms: '<h4>用户协议与免责声明</h4><p>1. 域名归属：平台提供的二级子域名（xxx.fblog.cyou）所有权属于平台，用户仅获得使用权，无法单独办理 ICP 备案。</p><p>2. 内容责任：用户对其域名下所有内容承担全部法律责任，不得违反中华人民共和国法律法规，不得发布侵权、暴力、色情、赌博、诈骗等违法信息；因内容引发的一切纠纷、处罚、赔偿由用户承担。</p><p>3. 服务免责：本服务基于 Cloudflare 海外节点，按现状提供，不做可用性保证；平台不对中断、故障、数据丢失承担责任，并有权随时维护、调整、关停。</p><p>4. 平台处置权：发现或收到有效举报违规内容时，平台有权直接暂停访问、回收域名、删除内容，无需事先通知。</p><p>5. 法律适用：本协议适用中华人民共和国法律，争议协商解决。</p>'
   };
-
   document.addEventListener('click', function (e) {
     var t = e.target, m = null;
-    while (t && t !== document) {
-      if (t.hasAttribute && t.hasAttribute('data-modal')) { m = t; break; }
-      t = t.parentNode;
-    }
-    if (m) {
-      e.preventDefault();
-      var key = m.getAttribute('data-modal');
-      $('#modal-title').textContent = key === 'rules' ? '使用规则' : '免责声明';
-      $('#modal-body').innerHTML = MODAL_CONTENT[key] || '';
-      $('#modal-overlay').classList.remove('hidden');
-    }
+    while (t && t !== document) { if (t.hasAttribute && t.hasAttribute('data-modal')) { m = t; break; } t = t.parentNode; }
+    if (m) { e.preventDefault(); var key = m.getAttribute('data-modal'); $('#modal-title').textContent = key === 'rules' ? '使用规则' : '用户协议与免责声明'; $('#modal-body').innerHTML = MODAL_CONTENT[key] || ''; $('#modal-overlay').classList.remove('hidden'); }
   });
   $('#modal-close').addEventListener('click', function () { $('#modal-overlay').classList.add('hidden'); });
   $('#modal-overlay').addEventListener('click', function (e) { if (e.target === this) $('#modal-overlay').classList.add('hidden'); });
 
-  // ---------- 初始化 ----------
-  api('/api/me')
-    .then(function (m) {
-      state.user = m.username;
-      state.rootDomain = m.rootDomain;
-      showView('dash');
-    })
-    .catch(function () {
-      showView('landing');
-    });
+  document.addEventListener('click', function (e) {
+    var t = e.target, target = null;
+    while (t && t !== document) { if (t.hasAttribute && t.hasAttribute('data-goto')) { target = t; break; } t = t.parentNode; }
+    if (target) {
+      e.preventDefault();
+      var v = target.getAttribute('data-goto');
+      if (v === 'register') { showMsg($('#reg-msg'), '', ''); $('#register-form').classList.remove('hidden'); $('#verify-form').classList.add('hidden'); $('#reg-switch2').classList.remove('hidden'); }
+      if (v === 'forgot') { showMsg($('#forgot-msg'), '', ''); $('#forgot-form').classList.remove('hidden'); $('#reset-form').classList.add('hidden'); $('#forgot-switch2').classList.remove('hidden'); }
+      showView(v);
+    }
+  });
+
+  loadStats();
+  api('/api/me').then(function (m) { state.user = m.username; state.role = m.role; showView('dash'); }).catch(function () { showView('landing'); });
 })();
 </script>
 
 <script>
-/* 背景动效：2D 粒子先渲染（零依赖即时可见），Three.js 加载成功后升级为 3D */
+/* 背景动效：2D 粒子即时可见，Three.js 加载后升级 3D（本地 vendor） */
 (function () {
-  var canvas = document.getElementById('bg');
-  if (!canvas) return;
-  var W = canvas.width = window.innerWidth;
-  var H = canvas.height = window.innerHeight;
-  var N = 90;
-  var ctx = canvas.getContext('2d');
-  var dots = [];
-  var usingThree = false;
-
-  function initDots() {
-    dots = [];
-    for (var i = 0; i < N; i++) dots.push({ x: Math.random() * W, y: Math.random() * H, vx: (Math.random() - .5) * .3, vy: (Math.random() - .5) * .3, r: Math.random() * 1.7 + .7 });
-  }
+  var canvas = document.getElementById('bg'); if (!canvas) return;
+  var W = canvas.width = window.innerWidth, H = canvas.height = window.innerHeight, N = 90;
+  var ctx = canvas.getContext('2d'), dots = [], usingThree = false;
+  function initDots() { dots = []; for (var i = 0; i < N; i++) dots.push({ x: Math.random() * W, y: Math.random() * H, vx: (Math.random() - .5) * .3, vy: (Math.random() - .5) * .3, r: Math.random() * 1.7 + .7 }); }
   initDots();
-
   function draw2D() {
     if (usingThree) return;
     ctx.clearRect(0, 0, W, H);
     for (var a = 0; a < dots.length; a++) {
-      var d = dots[a];
-      d.x += d.vx; d.y += d.vy;
-      if (d.x < 0 || d.x > W) d.vx *= -1;
-      if (d.y < 0 || d.y > H) d.vy *= -1;
-      ctx.beginPath(); ctx.arc(d.x, d.y, d.r, 0, 6.283);
-      ctx.fillStyle = 'rgba(194,65,12,.20)'; ctx.fill();
+      var d = dots[a]; d.x += d.vx; d.y += d.vy;
+      if (d.x < 0 || d.x > W) d.vx *= -1; if (d.y < 0 || d.y > H) d.vy *= -1;
+      ctx.beginPath(); ctx.arc(d.x, d.y, d.r, 0, 6.283); ctx.fillStyle = 'rgba(194,65,12,.20)'; ctx.fill();
       for (var b = a + 1; b < dots.length; b++) {
         var e = dots[b], dx = d.x - e.x, dy = d.y - e.y, dist = dx * dx + dy * dy;
-        if (dist < 9000) {
-          ctx.beginPath(); ctx.moveTo(d.x, d.y); ctx.lineTo(e.x, e.y);
-          ctx.strokeStyle = 'rgba(194,65,12,' + (0.07 * (1 - dist / 9000)) + ')';
-          ctx.lineWidth = .6; ctx.stroke();
-        }
+        if (dist < 9000) { ctx.beginPath(); ctx.moveTo(d.x, d.y); ctx.lineTo(e.x, e.y); ctx.strokeStyle = 'rgba(194,65,12,' + (0.07 * (1 - dist / 9000)) + ')'; ctx.lineWidth = .6; ctx.stroke(); }
       }
     }
     requestAnimationFrame(draw2D);
   }
   draw2D();
-
   function upgrade3D() {
     if (typeof THREE === 'undefined' || usingThree) return;
     try {
       usingThree = true;
-      var scene = new THREE.Scene();
-      var camera = new THREE.PerspectiveCamera(60, W / H, .1, 200);
-      camera.position.z = 40;
-      var renderer = new THREE.WebGLRenderer({ canvas: canvas, alpha: true, antialias: true });
-      renderer.setSize(W, H);
-      renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
-      var geo = new THREE.BufferGeometry();
-      var pos = new Float32Array(N * 3);
-      for (var p = 0; p < N * 3; p++) pos[p] = (Math.random() - .5) * 100;
+      var scene = new THREE.Scene(); var camera = new THREE.PerspectiveCamera(60, W / H, .1, 200); camera.position.z = 40;
+      var renderer = new THREE.WebGLRenderer({ canvas: canvas, alpha: true, antialias: true }); renderer.setSize(W, H); renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+      var geo = new THREE.BufferGeometry(); var pos = new Float32Array(N * 3); for (var p = 0; p < N * 3; p++) pos[p] = (Math.random() - .5) * 100;
       geo.setAttribute('position', new THREE.BufferAttribute(pos, 3));
       var mat = new THREE.PointsMaterial({ color: 0xc2410c, size: .55, transparent: true, opacity: .5, sizeAttenuation: true });
-      var points = new THREE.Points(geo, mat);
-      scene.add(points);
-      (function animate() {
-        if (!usingThree) return;
-        requestAnimationFrame(animate);
-        points.rotation.y += .0007;
-        points.rotation.x += .00025;
-        renderer.render(scene, camera);
-      })();
-      window.addEventListener('resize', function () {
-        W = canvas.width = window.innerWidth; H = canvas.height = window.innerHeight;
-        camera.aspect = W / H; camera.updateProjectionMatrix(); renderer.setSize(W, H);
-      });
+      var points = new THREE.Points(geo, mat); scene.add(points);
+      (function animate() { if (!usingThree) return; requestAnimationFrame(animate); points.rotation.y += .0007; points.rotation.x += .00025; renderer.render(scene, camera); })();
+      window.addEventListener('resize', function () { W = canvas.width = window.innerWidth; H = canvas.height = window.innerHeight; camera.aspect = W / H; camera.updateProjectionMatrix(); renderer.setSize(W, H); });
     } catch (e) { usingThree = false; initDots(); draw2D(); }
   }
-
-  // 异步加载 Three.js，不阻塞首屏
   var s = document.createElement('script');
-  s.src = 'https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.min.js';
-  s.onload = upgrade3D;
-  s.onerror = function () { /* 保持 2D */ };
+  s.src = '/vendor/three.min.js';
+  s.onload = upgrade3D; s.onerror = function () {};
   document.head.appendChild(s);
-})();
-
-/* 滚动渐入动效 */
-(function () {
-  var els = document.querySelectorAll('.card, .step, section > h2, .hero .badge, .hero h1, .hero p.sub, .hero .cta-row, .hero .stat, .rules');
-  els.forEach(function (el, i) {
-    el.classList.add('reveal');
-    el.style.transitionDelay = (i % 4) * 60 + 'ms';
-  });
-  if (!('IntersectionObserver' in window)) { els.forEach(function (el) { el.classList.add('in'); }); return; }
-  var io = new IntersectionObserver(function (entries) {
-    entries.forEach(function (en) {
-      if (en.isIntersecting) { en.target.classList.add('in'); io.unobserve(en.target); }
-    });
-  }, { threshold: .12 });
-  els.forEach(function (el) { io.observe(el); });
 })();
 </script>
 </body>

@@ -1,0 +1,79 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="description" content="fblog.cyou 免费二级域名平台使用教程：如何注册、申请子域名、设置 A/AAAA/CNAME 记录、使用 DDNS 动态解析。">
+<title>如何使用 · fblog.cyou 免费二级域名</title>
+<meta name="robots" content="index,follow">
+<style>
+  :root { --paper:#f6f1e6; --paper2:#eee6d5; --card:#fffdf7; --ink:#1c1712; --ink-soft:#5c5343; --line:#e2d8c3; --accent:#c2410c; --radius:14px; --serif:Georgia,"Times New Roman","Songti SC","Noto Serif SC",serif; --mono:ui-monospace,Consolas,monospace; }
+  * { box-sizing:border-box; margin:0; padding:0; }
+  body { font-family:system-ui,-apple-system,"PingFang SC","Microsoft YaHei","Segoe UI",sans-serif; background:var(--paper); color:var(--ink); line-height:1.8; }
+  .wrap { max-width:800px; margin:0 auto; padding:0 22px; }
+  nav { position:sticky; top:0; background:rgba(246,241,230,.9); backdrop-filter:blur(12px); border-bottom:1px solid var(--line); }
+  .nav-inner { display:flex; align-items:center; justify-content:space-between; height:60px; }
+  .logo { font-family:var(--serif); font-size:20px; font-weight:700; color:var(--ink); text-decoration:none; }
+  .logo .dot { color:var(--accent); }
+  .nav-links a { color:var(--ink-soft); text-decoration:none; font-size:14px; margin-left:18px; }
+  .nav-links a:hover { color:var(--ink); }
+  h1 { font-family:var(--serif); font-size:34px; margin:36px 0 8px; }
+  h2 { font-family:var(--serif); font-size:22px; margin:30px 0 10px; padding-top:10px; border-top:1px solid var(--line); }
+  p, li { color:var(--ink-soft); font-size:15px; }
+  ul, ol { padding-left:22px; margin:10px 0; }
+  li { margin:6px 0; }
+  code { background:var(--paper2); border:1px solid var(--line); border-radius:6px; padding:2px 8px; font-family:var(--mono); font-size:13.5px; color:var(--ink); }
+  .tip { background:var(--card); border:1px solid var(--line); border-left:4px solid var(--accent); border-radius:8px; padding:14px 18px; margin:14px 0; }
+  footer { border-top:1px solid var(--line); margin-top:48px; padding:26px 0 40px; text-align:center; color:var(--ink-soft); font-size:13px; }
+  footer a { color:var(--accent); text-decoration:none; }
+</style>
+</head>
+<body>
+<nav><div class="wrap nav-inner">
+  <a class="logo" href="/">fblog<span class="dot">.cyou</span></a>
+  <div class="nav-links"><a href="/">首页</a><a href="/rules">使用规则</a></div>
+</div></nav>
+
+<div class="wrap">
+  <h1>如何使用</h1>
+  <p>三步即可拥有一个免费的 <code>xxx.fblog.cyou</code> 二级域名。</p>
+
+  <h2>第一步：注册账号</h2>
+  <ol>
+    <li>打开 <a href="/" style="color:var(--accent)">dns.fblog.cyou</a>，点击右上角「免费注册」；</li>
+    <li>填写用户名、邮箱、密码，勾选同意《使用规则》与《用户协议与免责声明》；</li>
+    <li>点击「发送验证码」，去邮箱查收 6 位验证码并输入，完成注册。</li>
+  </ol>
+
+  <h2>第二步：申请占用子域名</h2>
+  <ol>
+    <li>登录后进入「申请子域名」；</li>
+    <li>输入想要的前缀（如 <code>myblog</code>），系统会实时检测是否可用；</li>
+    <li>点击「申请占用」，即可占有 <code>myblog.fblog.cyou</code>。</li>
+  </ol>
+  <div class="tip">申请仅占用前缀，此时还不设置记录。每个账号默认 1 个卡槽，第 2 个需 GitHub 星标（即将开放），第 3-5 个联系管理员开启。</div>
+
+  <h2>第三步：设置 DNS 记录</h2>
+  <p>在「我的子域名」中找到刚申请的域名，选择记录类型并填写目标地址：</p>
+  <ul>
+    <li><code>A</code>：指向 IPv4 地址，例如 <code>1.2.3.4</code>；</li>
+    <li><code>AAAA</code>：指向 IPv6 地址，例如 <code>2001:db8::1</code>；</li>
+    <li><code>CNAME</code>：指向另一个域名，例如 <code>example.com</code>。</li>
+  </ul>
+
+  <h2>DDNS 动态解析（家庭宽带）</h2>
+  <p>家庭宽带公网 IP 经常变化时，用 DDNS 自动更新。在「DDNS 管理」复制你的更新地址，配合路由器或脚本使用：</p>
+  <ul>
+    <li>curl 更新：<code>curl "https://dns.fblog.cyou/api/ddns?token=你的令牌&ip=1.2.3.4"</code></li>
+    <li>省略 <code>ip</code> 参数时自动使用你当前的公网 IP；</li>
+    <li>兼容 ddclient 等常见 DDNS 客户端。</li>
+  </ul>
+
+  <h2>续期规则</h2>
+  <p>每个二级域名有效期 1 年；剩余时间 ≤ 6 个月时可点击「续期 1 年」；到期未续将自动释放，前缀重新开放申请。</p>
+</div>
+
+<footer class="wrap">本站已运营 <span id="days">—</span> 天 · <a href="https://esa.fblog.cloud" target="_blank" rel="noopener">站长博客 esa.fblog.cloud</a> · <a href="/rules">使用规则</a> · <a href="/terms">用户协议与免责声明</a></footer>
+<script>document.getElementById('days').textContent = Math.max(1, Math.floor((Date.now() - Date.UTC(2026,8,14)) / 86400000));</script>
+</body>
+</html>
