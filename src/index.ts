@@ -781,14 +781,10 @@ export default {
       const url = new URL(request.url);
       const path = url.pathname;
 
-      // 静态资源（主页、独立页、robots、sitemap 等），把 /how 等改写为对应 .html
+      // 静态资源（主页、独立页、robots、sitemap 等）：直接透传原始请求，
+      // 由 assets 运行时处理干净 URL（/ → index.html、/how → how.html 等）
       if (request.method === 'GET' && !path.startsWith('/api/')) {
-        let p = path;
-        if (p === '/') p = '/index.html';
-        else if (p === '/how' || p === '/rules' || p === '/terms') p = p + '.html';
-        const assetUrl = new URL(request.url);
-        assetUrl.pathname = p;
-        return await env.ASSETS.fetch(new Request(assetUrl.toString(), request));
+        return await env.ASSETS.fetch(request);
       }
 
       if (!path.startsWith('/api/')) {
