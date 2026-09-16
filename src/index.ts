@@ -489,9 +489,11 @@ async function handleListRecords(request: Request, env: Env): Promise<Response> 
   return json({ records, rootDomain: env.ROOT_DOMAIN, maxSubdomains: MAX_SUBDOMAINS_PER_USER });
 }
 
-/** 可用性检测：前缀是否可申请 */
+/** 可用性检测：前缀是否可申请（公开接口，游客也可用；按 IP 限流防滥用） */
 async function handleCheckRecord(request: Request, env: Env): Promise<Response> {
-  await requireUser(request, env);
+  if (rateLimited('check:' + clientIp(request), 60, 60_000)) {
+    return json({ error: '检测过于频繁，请稍后再试' }, 429);
+  }
   const url = new URL(request.url);
   const sub = (url.searchParams.get('subdomain') ?? '').trim().toLowerCase();
   if (!sub) return json({ available: false, reason: '请输入前缀', fqdn: '' });
