@@ -81,6 +81,22 @@
   .hero h1 .accent { color: var(--accent); font-style: italic; }
   .hero p.sub { color: var(--ink-soft); font-size: 17px; max-width: 620px; margin: 20px auto 32px; }
   .hero .cta-row { display: flex; gap: 14px; justify-content: center; flex-wrap: wrap; }
+  .hero-check {
+    display: flex; align-items: center; justify-content: center; gap: 0;
+    max-width: 520px; margin: 0 auto 8px;
+    background: #fff; border: 1px solid var(--line); border-radius: 12px;
+    overflow: hidden; box-shadow: 0 2px 10px -4px rgba(28,23,18,.12);
+  }
+  .hero-check:focus-within { border-color: var(--accent); box-shadow: 0 0 0 3px rgba(194,65,12,.12); }
+  .hero-check input {
+    flex: 1; min-width: 0; border: none; outline: none; background: transparent;
+    padding: 14px 16px; font-size: 16px; color: var(--ink); margin: 0;
+  }
+  .hero-suffix { font-family: var(--mono); color: var(--ink-soft); font-size: 15px; padding-right: 12px; white-space: nowrap; }
+  .hero-check .btn { border-radius: 0; border: none; border-left: 1px solid var(--line); height: 100%; padding: 14px 22px; }
+  .hero-avail { justify-content: center; margin: 0 0 4px; min-height: 26px; }
+  .hero-avail.free { color: var(--ok); font-weight: 600; }
+  .hero-avail.taken { color: var(--danger); font-weight: 600; }
   .hero .stat-row { display: flex; gap: 44px; justify-content: center; margin-top: 48px; flex-wrap: wrap; }
   .hero .stat { border-left: 2px solid var(--line); padding-left: 16px; text-align: left; }
   .hero .stat b { display: block; font-family: var(--serif); font-size: 28px; color: var(--ink); }
@@ -256,6 +272,12 @@
     <span class="badge">⚡ 免费 · 注册即用 · 1 年有效期可续期</span>
     <h1>免费二级域名<br><span class="accent">xxx.fblog.cyou</span></h1>
     <p class="sub">为个人开发者、学习项目、家庭服务器提供免费的二级域名。支持 A / AAAA / CNAME 记录，提交即生效，全球 Cloudflare 节点解析。</p>
+    <div class="hero-check">
+      <input id="hero-sub" maxlength="63" placeholder="输入你想要的前缀，例如 myblog" autocomplete="off">
+      <span class="hero-suffix">.fblog.cyou</span>
+      <button class="btn btn-primary" id="hero-check-btn" type="button">检测可用性</button>
+    </div>
+    <div class="avail hero-avail" id="hero-avail"></div>
     <div class="cta-row">
       <a class="btn btn-primary" href="#" data-goto="register">免费注册</a>
       <a class="btn" href="#" data-goto="login">登录</a>
@@ -916,6 +938,39 @@
       return;
     }
     state.checkTimer = setTimeout(function () { checkAvailability(sub); }, 400);
+  });
+
+  // 主页 hero 检测按钮（游客可用）
+  function heroCheck() {
+    var sub = ($('#hero-sub').value || '').trim().toLowerCase();
+    var box = $('#hero-avail');
+    box.textContent = '';
+    if (!sub) { box.className = 'avail'; box.textContent = '请输入前缀'; return; }
+    var sp = document.createElement('div');
+    sp.className = 'spinner';
+    box.appendChild(sp);
+    box.appendChild(document.createTextNode(' 正在检测…'));
+    box.className = 'avail checking';
+    api('/api/records/check?subdomain=' + encodeURIComponent(sub))
+      .then(function (data) {
+        box.textContent = '';
+        if (data.available) {
+          box.className = 'avail hero-avail free';
+          box.textContent = '✓ ' + data.fqdn + ' 可以使用，注册后即可申请';
+        } else {
+          box.className = 'avail hero-avail taken';
+          box.textContent = '✕ ' + (data.reason || '已被占用');
+        }
+      })
+      .catch(function (e) {
+        box.textContent = '';
+        box.className = 'avail hero-avail';
+        box.textContent = e.message;
+      });
+  }
+  $('#hero-check-btn').addEventListener('click', heroCheck);
+  $('#hero-sub').addEventListener('keydown', function (ev) {
+    if (ev.key === 'Enter') { ev.preventDefault(); heroCheck(); }
   });
 
   $('#create-type').addEventListener('change', function () {
