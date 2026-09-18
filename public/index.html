@@ -412,7 +412,7 @@
   'use strict';
   var $ = function (sel) { return document.querySelector(sel); };
   var LAUNCH = Date.UTC(2026, 8, 14);
-  var state = { user: null, userEmail: null, role: 'user', slots: [], rootDomain: 'fblog.cyou', maxSlots: 2, publicSlotCap: 5, starBonusSlots: 3, githubStar: 0, checkTimer: null, checkSeq: 0 };
+  var state = { user: null, userEmail: null, role: 'user', slots: [], rootDomain: 'fblog.cyou', maxSlots: 2, publicSlotCap: 5, starBonusSlots: 3, githubStar: 0, view: 'landing', checkTimer: null, checkSeq: 0 };
 
   function api(path, opts) {
     opts = opts || {};
@@ -436,10 +436,25 @@
     el.textContent = text; el.className = 'msg show ' + (type || 'err');
   }
 
+  var VIEWS = ['landing', 'login', 'register', 'forgot', 'dash'];
+
+  /** 从 URL hash 读初始视图（#/dash 之类）；不是已知视图就返回 null */
+  function hashView() {
+    var raw = (location.hash || '').replace(/^#\/?/, '');
+    return raw && VIEWS.indexOf(raw) !== -1 ? raw : null;
+  }
+
   function showView(name) {
-    ['landing', 'login', 'register', 'forgot', 'dash'].forEach(function (v) {
+    if (VIEWS.indexOf(name) === -1) name = 'landing';
+    state.view = name;
+    VIEWS.forEach(function (v) {
       $('#view-' + v).classList.toggle('hidden', v !== name);
     });
+    // 把当前视图同步进 URL：刷新后能回到同一页，而不是一律跳控制台。
+    // 用 replaceState 是为了不把每次切换都塞进后退历史。
+    if (location.hash !== '#/' + name) {
+      try { history.replaceState(null, '', '#/' + name); } catch (err) { location.hash = '#/' + name; }
+    }
     window.scrollTo(0, 0);
     renderNav();
     if (name === 'dash') loadDash();
@@ -448,18 +463,21 @@
 
   function renderNav() {
     var box = $('#nav-cta'); box.textContent = '';
+    var onDash = state.view === 'dash';
+    // 当前所在页面对应的那个按钮才是深色（btn-primary），其余是浅色。
+    // 之前这里是写死的：控制台永远 btn-primary、首页永远浅色，跟当前页面无关。
     if (state.user) {
-      var home = document.createElement('a'); home.className = 'btn btn-sm'; home.href = '#'; home.textContent = '首页';
+      var home = document.createElement('a'); home.className = 'btn btn-sm' + (onDash ? '' : ' btn-primary'); home.href = '#'; home.textContent = '首页';
       home.addEventListener('click', function (e) { e.preventDefault(); showView('landing'); });
-      var dash = document.createElement('a'); dash.className = 'btn btn-sm btn-primary'; dash.href = '#'; dash.textContent = '控制台';
+      var dash = document.createElement('a'); dash.className = 'btn btn-sm' + (onDash ? ' btn-primary' : ''); dash.href = '#'; dash.textContent = '控制台';
       dash.addEventListener('click', function (e) { e.preventDefault(); showView('dash'); });
       var out = document.createElement('a'); out.className = 'btn btn-sm'; out.href = '#'; out.textContent = '退出';
       out.addEventListener('click', function (e) { e.preventDefault(); api('/api/logout', { method: 'POST' }).then(function () { state.user = null; state.role = 'user'; showView('landing'); }).catch(function () { showView('landing'); }); });
       box.appendChild(home); box.appendChild(dash); box.appendChild(out);
     } else {
-      var login = document.createElement('a'); login.className = 'btn btn-sm'; login.href = '#'; login.textContent = '登录';
+      var login = document.createElement('a'); login.className = 'btn btn-sm' + (state.view === 'login' ? ' btn-primary' : ''); login.href = '#'; login.textContent = '登录';
       login.addEventListener('click', function (e) { e.preventDefault(); showView('login'); });
-      var reg = document.createElement('a'); reg.className = 'btn btn-sm btn-primary'; reg.href = '#'; reg.textContent = '免费注册';
+      var reg = document.createElement('a'); reg.className = 'btn btn-sm' + ((state.view === 'register' || !onDash) ? ' btn-primary' : ''); reg.href = '#'; reg.textContent = '免费注册';
       reg.addEventListener('click', function (e) { e.preventDefault(); showView('register'); });
       box.appendChild(login); box.appendChild(reg);
     }
@@ -508,7 +526,7 @@
     if (!$('#reg-agree').checked) { showMsg($('#reg-msg'), '请先阅读并勾选同意《使用规则》与《用户协议与免责声明》', 'err'); return; }
     var btn = $('#reg-send-btn'); btn.disabled = true;
     api('/api/register', { method: 'POST', body: { username: $('#reg-username').value, email: $('#reg-email').value, password: $('#reg-password').value } })
-      .then(function (d) { $('#ver-email').value = d.email || $('#reg-email').value; $('#register-form').classList.add('hidden'); $('#verify-form').classList.remove('hidden'); $('#reg-switch2').classList.add('hidden'); showMsg($('#ver-msg'), '验证码已发送，请查收邮箱（10 分钟内有效）', 'info'); })
+      .then(function (d) { $('#ver-email').value = d.email || $('#reg-email').value; $('#register-form').classList.add('hidden'); $('#verify-form').classList.remove('hidden'); $('#reg-switch2').classList.add('hidden'); notifyCodeSent($('#ver-msg'), d.email || $('#reg-email').value); })
       .catch(function (e) { showMsg($('#reg-msg'), e.message, 'err'); })
       .finally(function () { btn.disabled = false; });
   });
@@ -521,14 +539,14 @@
   });
   $('#reg-resend').addEventListener('click', function () {
     api('/api/register', { method: 'POST', body: { username: $('#reg-username').value, email: $('#ver-email').value, password: $('#reg-password').value } })
-      .then(function () { showMsg($('#ver-msg'), '验证码已重新发送，请查收', 'info'); })
+      .then(function () { notifyCodeSent($('#ver-msg'), $('#ver-email').value); })
       .catch(function (e) { showMsg($('#ver-msg'), e.message, 'err'); });
   });
 
   $('#forgot-form').addEventListener('submit', function (ev) {
     ev.preventDefault(); var btn = $('#forgot-send-btn'); btn.disabled = true;
     api('/api/password/forgot', { method: 'POST', body: { email: $('#forgot-email').value } })
-      .then(function (d) { $('#reset-email').value = d.email || $('#forgot-email').value; $('#forgot-form').classList.add('hidden'); $('#reset-form').classList.remove('hidden'); $('#forgot-switch2').classList.add('hidden'); showMsg($('#reset-msg'), '验证码已发送，请查收邮箱', 'info'); })
+      .then(function (d) { $('#reset-email').value = d.email || $('#forgot-email').value; $('#forgot-form').classList.add('hidden'); $('#reset-form').classList.remove('hidden'); $('#forgot-switch2').classList.add('hidden'); notifyCodeSent($('#reset-msg'), d.email || $('#forgot-email').value); })
       .catch(function (e) { showMsg($('#forgot-msg'), e.message, 'err'); })
       .finally(function () { btn.disabled = false; });
   });
@@ -541,7 +559,7 @@
   });
   $('#forgot-resend').addEventListener('click', function () {
     api('/api/password/forgot', { method: 'POST', body: { email: $('#reset-email').value } })
-      .then(function () { showMsg($('#reset-msg'), '验证码已重新发送，请查收', 'info'); })
+      .then(function () { notifyCodeSent($('#reset-msg'), $('#reset-email').value); })
       .catch(function (e) { showMsg($('#reset-msg'), e.message, 'err'); });
   });
 
@@ -926,6 +944,28 @@
   $('#modal-close').addEventListener('click', function () { $('#modal-overlay').classList.add('hidden'); });
   $('#modal-overlay').addEventListener('click', function (e) { if (e.target === this) $('#modal-overlay').classList.add('hidden'); });
 
+  /** 通用提示弹窗（复用规则/协议那个遮罩层） */
+  function showAlert(title, html) {
+    $('#modal-title').textContent = title;
+    $('#modal-body').innerHTML = html;
+    $('#modal-overlay').classList.remove('hidden');
+  }
+
+  /**
+   * 验证码已发出的统一提示：行内消息 + 一个明确提醒检查垃圾箱的弹窗。
+   * 邮件被误判成垃圾是这里最常见的问题，只给一行小字提示基本没人会注意。
+   */
+  function notifyCodeSent(msgEl, email) {
+    showMsg(msgEl, '验证码已发送，请查收邮箱（10 分钟内有效）', 'info');
+    showAlert(
+      '验证码已发送',
+      '<p>我们已向 <b>' + esc(email || '你的邮箱') + '</b> 发出一封包含 6 位验证码的邮件，<b>10 分钟内有效</b>。</p>' +
+        '<p style="margin-top:12px;font-size:14px">📬 <b>没收到？请到「垃圾邮件 / 广告邮件」文件夹里找一找。</b><br>' +
+        '<span style="color:#7a6f63;font-size:12.5px">第一次收到本平台的邮件时，很容易被邮箱判成垃圾邮件。</span></p>' +
+        '<p style="margin-top:10px;color:#7a6f63;font-size:12.5px">垃圾箱里也没有的话，等 1-2 分钟后点「重发验证码」即可。</p>',
+    );
+  }
+
   document.addEventListener('click', function (e) {
     var t = e.target, target = null;
     while (t && t !== document) { if (t.hasAttribute && t.hasAttribute('data-goto')) { target = t; break; } t = t.parentNode; }
@@ -939,7 +979,20 @@
   });
 
   loadStats();
-  api('/api/me').then(function (m) { state.user = m.username; state.role = m.role; showView('dash'); }).catch(function () { showView('landing'); });
+  // 初始视图由 URL hash 决定（刷新后停在原处）；没有 hash 就停在首页。
+  // 之前这里是无条件的 showView('dash')，导致已登录用户一刷新首页就被拽进控制台。
+  var initialView = hashView();
+  api('/api/me')
+    .then(function (m) {
+      state.user = m.username; state.role = m.role;
+      showView(initialView || 'landing');
+    })
+    .catch(function () {
+      state.user = null;
+      // 未登录时只允许停在登录/注册/找回这几个访客页面，dash 会退回首页
+      var guestOnly = ['login', 'register', 'forgot'];
+      showView(initialView && guestOnly.indexOf(initialView) !== -1 ? initialView : 'landing');
+    });
 })();
 </script>
 
