@@ -1,24 +1,40 @@
--- fblog.cyou 迁移 6：反向代理用量统计（用于免费额度告警）
+CREATE TABLE IF NOT EXISTS proxy_usage (day TEXT PRIMARY KEY, requests INTEGER NOT NULL DEFAULT 0, proxied INTEGER NOT NULL DEFAULT 0, limited INTEGER NOT NULL DEFAULT 0, alerted INTEGER NOT NULL DEFAULT 0, updated_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ', 'now')));
+
+-- ============================================================================
+-- 校验（执行完上面那条后，单独再跑这一条 —— D1 Console 一次只接受一条语句）：
+--   SELECT * FROM proxy_usage ORDER BY day DESC LIMIT 7;
+-- ============================================================================
+--
+-- ⚠️ 为什么这条语句写成一整行、且放在文件最前面
+--
+-- D1 Console 粘贴时可能把换行压成一行。SQLite 的 `--` 是「注释到行尾」，
+-- 一旦整个脚本变成一行，第一个 `--` 就会把后面**全部内容**注释掉，
+-- 报错是 `incomplete input: SQLITE_ERROR` —— 不是语法写错，是内容被吃掉了。
+-- 把可执行语句放在最前面并写成一整行，无论换行是否被压扁都能正确执行：
+--   CREATE TABLE ... ; -- 注释... -- 注释...   ← 语句先执行完，后面全被注释，无害
+--
+-- 用 wrangler 跑文件时换行不会被压，可直接用：
+--   npx wrangler d1 execute fblog-dns-db --remote --file=./migration-usage.sql
+--
+-- ============================================================================
+-- 迁移 6：反向代理用量统计（用于免费额度告警）
+-- ============================================================================
 --
 -- 为什么需要：反代把全站子域名流量都引到了平台自己的 Worker 上，吃的是平台的
 -- Workers 免费额度（100,000 请求/天，午夜 UTC 重置）。额度跑满时 Cloudflare 会
 -- 返回 1027；若该路由为 fail open，请求会被绕过 Worker 直接回源到占位地址 100::，
 -- 结果是**所有反代站点一起 522**。所以必须能提前看到用量。
 --
--- 计数器在 Worker 内存里累加，按批（默认每 200 次请求或每 60 秒）汇总写一张表，
+-- 计数器在 Worker 内存里累加，按批（默认每 200 次请求或每 60 秒）汇总写这张表，
 -- 把 D1 写放大压到 0.5% 以内。因此这里是**近似值**：isolate 被回收时未落盘的计数
 -- 会丢失，实际用量通常略高于表中数字。作为告警信号足够。
 --
--- 在 Cloudflare Dashboard → D1 → fblog-dns-db → Console 中粘贴执行。
-
-CREATE TABLE IF NOT EXISTS proxy_usage (
-  day        TEXT PRIMARY KEY,          -- UTC 日期 YYYY-MM-DD
-  requests   INTEGER NOT NULL DEFAULT 0, -- 反代分发处理的请求总数
-  proxied    INTEGER NOT NULL DEFAULT 0, -- 其中成功转发到用户目标的
-  limited    INTEGER NOT NULL DEFAULT 0, -- 其中被限流拦下的
-  alerted    INTEGER NOT NULL DEFAULT 0, -- 是否已就该日发过额度告警（0/1）
-  updated_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ', 'now'))
-);
-
--- 校验
--- SELECT * FROM proxy_usage ORDER BY day DESC LIMIT 7;
+-- 字段说明：
+--   day        UTC 日期 YYYY-MM-DD
+--   requests   反代分发处理的请求总数
+--   proxied    其中成功转发到用户目标的
+--   limited    其中被限流拦下的
+--   alerted    是否已就该日发过额度告警（0/1），用于保证每天最多一封
+--
+-- 未执行本迁移时平台不会报错：用量落盘与管理端查询都包了 try/catch，
+-- 只是管理面板看不到统计数据、也发不出额度告警。

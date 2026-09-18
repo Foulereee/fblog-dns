@@ -145,6 +145,14 @@ npx wrangler d1 execute fblog-dns-db --remote --file=./migration-proxy.sql
 npx wrangler d1 execute fblog-dns-db --remote --file=./migration-usage.sql
 ```
 
+> ⚠️ **粘贴到 D1 Console 的坑**：SQLite 的 `--` 是「注释到行尾」。有些编辑器/网页在粘贴时会把
+> 换行压成一行，此时第一个 `--` 会把后面**全部内容**注释掉，报错是
+> `incomplete input: SQLITE_ERROR` —— 看着像语法错，其实是内容被吃掉了（真实踩过）。
+> 优先用上面的 `--file=` 方式；必须粘贴时，先把所有 `--` 注释删掉。
+> `migration-usage.sql` 已改写成「语句在最前、且为一整行」，压扁也不受影响；
+> 其余迁移文件（`migration.sql`、`migration-v2.sql`、`migration-proxy.sql` 等）**不受此保护**，
+> 请勿直接整段粘贴到 Console。
+
 > 代价：反代请求会消耗**平台自己**的 Workers 额度（免费 10 万请求/天），且平台能看到这些流量。
 > 额度是**全平台共享**的 —— 一个被刷的站点能拖垮所有人，所以务必确认下文的三个防护已生效。
 > 另外反代只放行 `*.workers.dev` 与 `*.pages.dev` 目标，这是刻意的安全边界 ——
