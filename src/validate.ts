@@ -70,3 +70,53 @@ export function validateValue(type: string, value: string, rootDomain: string): 
 
   return '仅支持 A / AAAA / CNAME 三种记录类型';
 }
+
+/**
+ * 允许被反代的来源后缀：只放行 Cloudflare 自家的部署域名。
+ * 这是刻意的安全边界 —— 不限制的话平台就成了任人使用的公开反向代理，
+ * 很容易被拿去做滥用流量、绕过对方封禁等事情。
+ */
+export const PROXY_ALLOWED_SUFFIXES = ['.workers.dev', '.pages.dev'];
+
+/**
+ * 校验反代目标地址，返回错误信息或 null。
+ * @param input 用户填写的地址，例如 `https://my-worker.my-name.workers.dev`
+ * @param rootDomain 平台根域名，用于阻止把自己反代给自己
+ */
+export function validateProxyTarget(input: string, rootDomain: string): string | null {
+  const raw = input.trim();
+  if (!raw) return '反代目标不能为空';
+
+  let u: URL;
+  try {
+    u = new URL(raw);
+  } catch {
+    return '反代目标需要是完整网址，例如 https://my-worker.my-name.workers.dev';
+  }
+
+  if (u.protocol !== 'https:') return '反代目标必须使用 https://（Workers/Pages 都自带 HTTPS）';
+  if (u.username || u.password) return '反代目标不能包含用户名或密码';
+
+  const host = u.hostname.toLowerCase();
+  if (host === 'workers.dev' || host === 'pages.dev') {
+    return '请填写具体的项目地址（例如 my-worker.my-name.workers.dev），而不是 workers.dev 本身';
+  }
+  if (!PROXY_ALLOWED_SUFFIXES.some((suffix) => host.endsWith(suffix))) {
+    return '反代目标只支持 Cloudflare Workers（*.workers.dev）或 Pages（*.pages.dev）地址';
+  }
+
+  const rd = rootDomain.toLowerCase();
+  if (host === rd || host.endsWith('.' + rd)) {
+    return '反代目标不能指向本域名自身，防止回环';
+  }
+
+  if ((u.pathname && u.pathname !== '/') || u.search || u.hash) {
+    return '反代目标只填到域名即可，不要带路径、查询参数或锚点';
+  }
+  return null;
+}
+
+/** 把用户输入规整成规范的 origin（`https://host`），仅在 validateProxyTarget 通过后调用 */
+export function normalizeProxyTarget(input: string): string {
+  return new URL(input.trim()).origin;
+}

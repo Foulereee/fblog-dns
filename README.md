@@ -95,13 +95,64 @@ curl -X POST https://fblog-dns.<你的子域>.workers.dev/api/admin/users \
 
 ## 用户自助部署到 Workers/Pages（可选）
 
-平台支持用户把 `xxx.fblog.cyou` 绑定为 Cloudflare Workers（函数）/ Pages（页面）的**自定义域名**（跨账号 CNAME setup，免费）：
+> ⚠️ **先纠正一个常见误解**：Cloudflare **不允许把子域名添加为独立 zone**。以下都是实测结果：
+> - 「添加站点」填 `xxx.fblog.cyou` → 被 `1116 Please ensure you are providing the root domain...` 拒绝，
+>   **父域在不在 Cloudflare 上、在谁的账号里，结果都一样**；
+> - 官方给子域名的正规通路是 **CNAME setup（建 zone 时 `type: partial`）**，
+>   但它要 **Business 及以上套餐** —— 免费账号会返回 `1104 Partial zone signup not allowed`；
+> - **Cloudflare for SaaS / Custom Hostnames** 需要**销售对接 / Enterprise 配额**，免费账号返回
+>   `1404 No quota has been allocated for this zone or for this account`。
+>
+> 结论：**给用户「完整 zone」这条路走不通**，平台改为提供下面两条替代路线。
 
-1. 用户在**自己的** Cloudflare 账号创建 Workers / Pages 项目；
-2. 项目 → **Custom domains / 自定义域名** → 添加 `xxx.fblog.cyou`，拿到 Cloudflare 给的 **CNAME 目标**（形如 `xxx.fblog.cyou.cdn.cloudflare.net`）；
-3. 用户回到本平台「我的子域名」，把目标填进该子域名的 **CNAME** 记录值，保存即可，Cloudflare 会自动签发 HTTPS 证书。
+### 路线 A（推荐，免费账号也能用）：平台反代
 
-> 平台侧记录统一为「仅 DNS（灰云）」；CNAME 目标已兼容 Cloudflare 的尾点写法。面向用户的图文说明见 `/how`。
+用户把 `xxx.fblog.cyou` 指向自己在 Cloudflare 上部署的 Workers / Pages ——
+**代码、部署、更新都在用户自己账号里**，平台只做一层透明转发。
+
+1. 用户在自己的 Cloudflare 账号部署 Workers（得到 `my-worker.my-name.workers.dev`）
+   或 Pages（得到 `my-project.pages.dev`）；
+2. 用户到本平台「我的子域名」→ 该卡槽点 **开启反代** → 填入该地址 → 保存；
+3. 访问 `https://xxx.fblog.cyou` 即转发到用户的部署。
+
+实现方式：平台用 **Workers 通配路由 `*.fblog.cyou/*`** 收下全部子域名请求，按 Host 反查 D1，
+再 `fetch()` 转发到用户登记的目标。转发时会剥掉逐跳首部、补上
+`X-Forwarded-Host` / `X-Forwarded-Proto` / `X-Real-IP` / `X-Original-Host`，
+并把重定向响应里的 `Location` 从目标主机改回用户看到的域名。
+
+**🔴 上线前的一次性前置条件（漏了会发现子域名根本不解析）：**
+
+```
+AAAA  *.fblog.cyou   100::    代理状态：已代理（橙云）
+```
+
+没有这条泛解析，子域名解析不到 Cloudflare 边缘，通配路由永远不会触发。
+已有「仅 DNS（灰云）」记录的子域名**优先级更高**，照旧直连用户自己的服务器 —— 两套机制互不干扰。
+
+**🔴 升级已有部署：先跑迁移，再发代码**
+
+`subdomains` 表新增了 `proxy_target` 列，顺序不能反：
+
+```bash
+npx wrangler d1 execute fblog-dns-db --remote --file=./migration-proxy.sql
+```
+
+代码里对这个查询做了兜底（列不存在也不会让平台挂掉），但反代功能要等迁移跑完才生效。
+
+> 代价：反代请求会消耗**平台自己**的 Workers 额度（免费 10 万请求/天），且平台能看到这些流量。
+> 另外反代只放行 `*.workers.dev` 与 `*.pages.dev` 目标，这是刻意的安全边界 ——
+> 不限制的话平台就成了任人使用的公开反向代理。
+
+### 路线 B（仅 Business+ 套餐可用）：CNAME setup
+
+用户在自己账号把 `xxx.fblog.cyou` 添加为 **CNAME setup** 的 zone，拿到
+`xxx.fblog.cyou.cdn.cloudflare.net` 目标，再填进本平台的 **CNAME** 记录。
+**免费账号走不通（`1104`）**，所以平台把 CNAME 校验放宽到接受 `*.cdn.cloudflare.net`
+（含尾点写法）只是为了服务这部分付费用户。
+
+> **两条路互斥**：同一个卡槽要么填 DNS 记录（含路线 B 的 CNAME），要么开反代。
+> 同时设置时请求会被 DNS 直接解析走、根本到不了 Worker，所以平台会直接拦住并提示原因。
+> 面向用户的图文说明见 `/how`。
 
 ## 六、上线后的安全清单（务必做）
 
@@ -133,6 +184,10 @@ curl -X POST https://fblog-dns.<你的子域>.workers.dev/api/admin/users \
 | GET | `/api/records` | 我的记录 |
 | POST | `/api/records` | 创建/更新 `{subdomain, type, value}` |
 | DELETE | `/api/records/:id` | 删除记录 |
+| POST | `/api/slots/:id/record` | 设置/更新该卡槽的 DNS 记录 |
+| DELETE | `/api/slots/:id/record` | 删除该卡槽的 DNS 记录 |
+| POST | `/api/slots/:id/proxy` | 开启/更新反代，`{target:"https://x.y.workers.dev"}` |
+| DELETE | `/api/slots/:id/proxy` | 关闭反代 |
 | POST | `/api/admin/users` | 管理员建号（Bearer ADMIN_PASSWORD） |
 
 ## 目录结构

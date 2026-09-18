@@ -8,9 +8,28 @@
 		"binding": "ASSETS",
 		"run_worker_first": true
 	},
-	"custom_domains": [
+	// 路由与自定义域名。
+	// ⚠️ wrangler 4 已不支持顶层 `custom_domains` 字段（会被静默忽略并告警），
+	//    自定义域名必须写成 routes 里 `custom_domain: true` 的形式。
+	"routes": [
+		// 平台自己的入口：管理面板 + API
 		{
-			"pattern": "dns.fblog.cyou"
+			"pattern": "dns.fblog.cyou",
+			"custom_domain": true
+		},
+		// 通配路由：所有 *.fblog.cyou 的请求都交给本 Worker，由 Worker 按 Host 分发 ——
+		// 若该子域名登记了反代目标，就转发到用户自己的 Workers/Pages；否则返回一张落地页。
+		//
+		// ⚠️ 上线前必须再补一条「泛解析」DNS 记录，否则子域名根本解析不到 CF 边缘，
+		//    通配路由永远不会触发：
+		//      AAAA  *.fblog.cyou   100::    代理状态：已代理（橙云）
+		//    已有「仅 DNS（灰云）」记录的子域名优先级更高，照旧直连用户自己的服务器。
+		//
+		// 自定义域名 / 更精确的路由优先级高于通配路由，
+		// 所以 dns.fblog.cyou、cfnew.fblog.cyou 等不会被这里抢走。
+		{
+			"pattern": "*.fblog.cyou/*",
+			"zone_name": "fblog.cyou"
 		}
 	],
 	// Cloudflare Email Service：邮箱注册验证码 / 到期提醒

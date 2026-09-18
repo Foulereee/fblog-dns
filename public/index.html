@@ -596,6 +596,7 @@
   });
 
   function fmtDate(ts) { if (!ts) return '-'; var d = new Date(ts); return d.getFullYear() + '-' + String(d.getMonth()+1).padStart(2,'0') + '-' + String(d.getDate()).padStart(2,'0'); }
+  function esc(s) { return String(s == null ? '' : s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;'); }
   function renderSlots() {
     var box = $('#slots-box'); box.textContent = '';
     if (!state.slots.length) { var e = document.createElement('div'); e.className = 'empty'; e.textContent = '还没有子域名，到「申请子域名」占用一个吧。'; box.appendChild(e); return; }
@@ -604,11 +605,13 @@
       var head = document.createElement('div'); head.className = 'slot-head';
       var name = document.createElement('span'); name.className = 'slot-name'; name.textContent = s.name + '.' + state.rootDomain;
       var pill = document.createElement('span');
-      pill.className = 'pill ' + (s.expired ? 'danger' : s.record ? 'ok' : 'gray');
-      pill.textContent = s.expired ? '已过期' : s.record ? '已使用 · ' + s.record.type : '未使用';
+      var used = !!(s.record || s.proxy_target);
+      pill.className = 'pill ' + (s.expired ? 'danger' : used ? 'ok' : 'gray');
+      pill.textContent = s.expired ? '已过期' : s.record ? '已使用 · ' + s.record.type : s.proxy_target ? '反代中' : '未使用';
       head.appendChild(name); head.appendChild(pill);
       var meta = document.createElement('div'); meta.className = 'slot-meta';
-      meta.textContent = '到期 ' + fmtDate(s.expires_at) + '（剩 ' + s.days_remaining + ' 天）' + (s.record ? ' · 值 ' + s.record.value : '');
+      meta.textContent = '到期 ' + fmtDate(s.expires_at) + '（剩 ' + s.days_remaining + ' 天）'
+        + (s.record ? ' · 值 ' + s.record.value : s.proxy_target ? ' · 反代 → ' + s.proxy_target : '');
       card.appendChild(head); card.appendChild(meta);
 
       var rf = document.createElement('div'); rf.className = 'rec-form';
@@ -646,7 +649,42 @@
         renew.addEventListener('click', function () { api('/api/slots/' + s.id + '/renew', { method: 'POST' }).then(function () { toast('已续期', 'ok'); loadDash(); }).catch(function (e) { toast(e.message, 'err'); }); });
         rf.appendChild(renew);
       }
-      card.appendChild(rf); box.appendChild(card);
+      card.appendChild(rf);
+
+      // ---- 反代到自己的 Cloudflare Workers / Pages ----
+      var fqdn = s.name + '.' + state.rootDomain;
+      var pf = document.createElement('div'); pf.className = 'rec-form';
+      var pin = document.createElement('input');
+      pin.placeholder = 'https://my-worker.my-name.workers.dev';
+      pin.value = s.proxy_target || '';
+      var pHint = document.createElement('div');
+      pHint.style.cssText = 'flex-basis:100%;font-size:12px;color:var(--ink-soft);line-height:1.6';
+      pHint.innerHTML = s.proxy_target
+        ? '✅ 已反代到 <code style="font-size:11px">' + esc(s.proxy_target) + '</code>：访问 <code style="font-size:11px">' + esc(fqdn) + '</code> 会转发到这里。'
+        : '💡 把 <code style="font-size:11px">' + esc(fqdn) + '</code> 指向你自己账号里部署的 Cloudflare Workers / Pages（<code style="font-size:11px">*.workers.dev</code> 或 <code style="font-size:11px">*.pages.dev</code>）。代码和部署都在你自己账号，平台只做一层转发。与上面那条 DNS 记录<b>互斥</b>，二选一。';
+      var pSetBtn = document.createElement('button');
+      pSetBtn.className = 'btn btn-sm btn-primary'; pSetBtn.type = 'button';
+      pSetBtn.textContent = s.proxy_target ? '更新反代' : '开启反代';
+      pSetBtn.addEventListener('click', function () {
+        pSetBtn.disabled = true;
+        api('/api/slots/' + s.id + '/proxy', { method: 'POST', body: { target: pin.value } })
+          .then(function (d) { toast((d && d.warning) ? d.warning : '反代已开启', (d && d.warning) ? 'err' : 'ok'); loadDash(); })
+          .catch(function (e) { toast(e.message, 'err'); pSetBtn.disabled = false; });
+      });
+      pf.appendChild(pin); pf.appendChild(pSetBtn);
+      if (s.proxy_target) {
+        var pDelBtn = document.createElement('button');
+        pDelBtn.className = 'btn btn-sm btn-danger'; pDelBtn.type = 'button'; pDelBtn.textContent = '关闭反代';
+        pDelBtn.addEventListener('click', function () {
+          if (!window.confirm('确定关闭 ' + fqdn + ' 的反代吗？关闭后将不再转发到你的 Worker。')) return;
+          api('/api/slots/' + s.id + '/proxy', { method: 'DELETE' }).then(function () { toast('已关闭反代', 'ok'); loadDash(); }).catch(function (e) { toast(e.message, 'err'); });
+        });
+        pf.appendChild(pDelBtn);
+      }
+      pf.appendChild(pHint);
+      card.appendChild(pf);
+
+      box.appendChild(card);
     });
   }
 
@@ -719,7 +757,7 @@
       var tr = document.createElement('tr');
       var td1 = document.createElement('td'); var c = document.createElement('code'); c.textContent = s.name + '.fblog.cyou'; td1.appendChild(c);
       var td2 = document.createElement('td'); td2.textContent = s.username + (s.email ? ' / ' + s.email : '');
-      var td3 = document.createElement('td'); td3.textContent = s.type ? s.type + ' → ' + s.value : '未使用';
+      var td3 = document.createElement('td'); td3.textContent = s.type ? s.type + ' → ' + s.value : s.proxy_target ? '反代 → ' + s.proxy_target : '未使用';
       var td4 = document.createElement('td'); td4.className = 'small muted'; td4.textContent = fmtDate(s.expires_at);
       var td5 = document.createElement('td');
       var del = document.createElement('button'); del.className = 'btn btn-sm btn-danger'; del.type = 'button'; del.textContent = '回收';

@@ -17,7 +17,7 @@ import {
   hashEmailCode,
   usernameFromEmail,
 } from './auth';
-import { validateSubdomain, validateValue } from './validate';
+import { validateSubdomain, validateValue, validateProxyTarget, normalizeProxyTarget } from './validate';
 import { CfDns } from './cloudflare';
 import { EmailBinding, sendCodeEmail, sendExpiryReminder, sendResetCodeEmail } from './email';
 
@@ -440,6 +440,18 @@ async function handleListSlots(request: Request, env: Env): Promise<Response> {
     'SELECT id, name, expires_at, renewed_at, ddns_token, created_at FROM subdomains WHERE user_id = ?1 ORDER BY created_at DESC',
   ).bind(user.id).all<SlotRow>();
   const now = Date.now();
+  // 反代目标单独查一次：万一迁移还没执行，也不会让整个列表接口挂掉
+  const proxyTargets = new Map<number, string>();
+  try {
+    const rows = await env.DB.prepare(
+      'SELECT id, proxy_target FROM subdomains WHERE user_id = ?1 AND proxy_target IS NOT NULL',
+    )
+      .bind(user.id)
+      .all<{ id: number; proxy_target: string }>();
+    for (const r of rows.results ?? []) proxyTargets.set(r.id, r.proxy_target);
+  } catch {
+    /* proxy_target 列不存在（迁移未执行）：忽略即可 */
+  }
   const out = [];
   for (const s of slots.results ?? []) {
     const rec = await env.DB.prepare('SELECT type, value FROM records WHERE subdomain_id = ?1').bind(s.id).first<{ type: string; value: string }>();
@@ -455,6 +467,7 @@ async function handleListSlots(request: Request, env: Env): Promise<Response> {
       renewable: remaining > 0 && remaining <= RENEW_WINDOW_MS,
       expired: remaining <= 0,
       ddns_token: s.ddns_token ?? '',
+      proxy_target: proxyTargets.get(s.id) ?? null,
     });
   }
   return json({ slots: out, rootDomain: env.ROOT_DOMAIN, maxSlots: maxSlotsFor(user) });
@@ -495,6 +508,11 @@ async function handleSetRecord(request: Request, env: Env, path: string): Promis
   const id = Number(m[1]);
   const slot = await env.DB.prepare('SELECT id, name FROM subdomains WHERE id = ?1 AND user_id = ?2').bind(id, user.id).first<{ id: number; name: string }>();
   if (!slot) return json({ error: '卡槽不存在或无权操作' }, 404);
+
+  const proxied = await readProxyTarget(env, id);
+  if (proxied) {
+    return json({ error: `该子域名已开启反代（${proxied}），与 DNS 记录互斥。请先关闭反代再设置记录。` }, 409);
+  }
 
   const body = await readJson(request);
   const type = String(body?.type ?? '').toUpperCase();
@@ -680,13 +698,20 @@ async function handleAdminSetSlots(request: Request, env: Env, path: string): Pr
 
 async function handleAdminSlots(request: Request, env: Env): Promise<Response> {
   await requireAdmin(request, env);
-  const rows = await env.DB.prepare(
+  const base = (proxyCol: string) =>
     `SELECT s.id, s.name, s.expires_at, s.created_at, u.username, u.email,
+            ${proxyCol} AS proxy_target,
             (SELECT r.type FROM records r WHERE r.subdomain_id = s.id) AS type,
             (SELECT r.value FROM records r WHERE r.subdomain_id = s.id) AS value
-     FROM subdomains s JOIN users u ON u.id = s.user_id ORDER BY s.id DESC`,
-  ).all();
-  return json({ slots: rows.results ?? [] });
+     FROM subdomains s JOIN users u ON u.id = s.user_id ORDER BY s.id DESC`;
+  try {
+    const rows = await env.DB.prepare(base('s.proxy_target')).all();
+    return json({ slots: rows.results ?? [] });
+  } catch {
+    // proxy_target 列不存在（迁移未执行）：退回旧查询，管理端照常可用
+    const rows = await env.DB.prepare(base('NULL')).all();
+    return json({ slots: rows.results ?? [] });
+  }
 }
 
 async function handleAdminReserved(request: Request, env: Env): Promise<Response> {
@@ -775,12 +800,243 @@ async function scheduled(_event: ScheduledController, env: Env, _ctx: ExecutionC
   }
 }
 
+// ---------- 子域名反代（把 xxx.fblog.cyou 转发到用户自己的 Workers / Pages）----------
+//
+// 背景：Cloudflare 早已不允许把子域名添加为独立 zone（API 报 1116），
+// 所以「用户把 xxx.fblog.cyou 绑到自己 Cloudflare 账号」这条路已经走不通了。
+// 替代方案：平台用通配路由 *.fblog.cyou/* 收下全部子域名请求，再按 Host 反代到
+// 用户自己在 Workers/Pages 上的部署地址。用户依旧「用自己的 Worker」，只是多了一跳。
+
+/** 平台自身占用的子域名前缀：这些 Host 走平台界面，绝不参与反代 */
+const PLATFORM_LABELS = new Set(['dns', 'www']);
+
+/** 转发时应剥掉的逐跳首部（RFC 7230 §6.1） */
+const HOP_BY_HOP_HEADERS = [
+  'connection',
+  'keep-alive',
+  'proxy-authenticate',
+  'proxy-authorization',
+  'te',
+  'trailer',
+  'transfer-encoding',
+  'upgrade',
+];
+
+/** 无目标 / 已过期 / 未登记时给访客看的落地页 */
+function landingPage(env: Env, host: string, kind: 'unregistered' | 'expired' | 'idle'): Response {
+  const title = kind === 'expired' ? '子域名已过期' : kind === 'idle' ? '尚未指向任何内容' : '子域名不存在';
+  const detail =
+    kind === 'expired'
+      ? '这个子域名已过期并被平台回收，可以重新申请。'
+      : kind === 'idle'
+        ? '这个子域名已被占用，但所有者还没有把它指向自己的网站或 Worker。'
+        : '这个子域名还没有被任何人申请。';
+  const html =
+    '<!doctype html><html lang="zh-CN"><head><meta charset="utf-8">' +
+    '<meta name="viewport" content="width=device-width,initial-scale=1">' +
+    '<meta name="robots" content="noindex">' +
+    `<title>${title} · ${escapeHtml(host)}</title></head>` +
+    '<body style="margin:0;min-height:100vh;display:flex;align-items:center;justify-content:center;' +
+    "font-family:system-ui,-apple-system,'Segoe UI',sans-serif;background:#f6f1e6;color:#1c1712\">" +
+    '<div style="max-width:520px;padding:32px;text-align:center">' +
+    `<h1 style="font-size:20px;margin:0 0 12px">${title}</h1>` +
+    `<p style="margin:0 0 10px;color:#5b5147;line-height:1.8">${detail}</p>` +
+    `<p style="margin:0 0 22px;color:#5b5147;line-height:1.8"><code style="background:#eae2d2;padding:2px 6px;border-radius:4px">${escapeHtml(host)}</code></p>` +
+    `<a href="https://dns.${escapeHtml(env.ROOT_DOMAIN)}/" style="display:inline-block;padding:10px 18px;border-radius:8px;` +
+    'background:#1c1712;color:#f6f1e6;text-decoration:none;font-weight:600">前往 fblog.cyou 免费二级域名平台</a>' +
+    '</div></body></html>';
+  return new Response(html, {
+    status: kind === 'unregistered' ? 404 : 200,
+    headers: { 'Content-Type': 'text/html; charset=utf-8', 'Cache-Control': 'no-store' },
+  });
+}
+
+/**
+ * 把响应里的 Location 从「目标主机」改回「用户看到的域名」，
+ * 否则浏览器会被甩到 xxx.workers.dev 上，地址栏就暴露且跨域了。
+ */
+function rewriteLocation(location: string, outUrl: URL, targetHost: string): string {
+  try {
+    const abs = new URL(location, outUrl);
+    return abs.host === targetHost ? abs.pathname + abs.search + abs.hash : location;
+  } catch {
+    return location;
+  }
+}
+
+/** 把请求原样转发到用户登记的 Workers/Pages 地址 */
+async function proxyTo(target: string, request: Request, host: string): Promise<Response> {
+  const base = new URL(target);
+  const inUrl = new URL(request.url);
+  const outUrl = new URL(inUrl.pathname + inUrl.search, base);
+
+  const headers = new Headers(request.headers);
+  for (const h of HOP_BY_HOP_HEADERS) headers.delete(h);
+  // Host 由 fetch 依据 outUrl 自动生成，手动设置会被运行时忽略甚至报错
+  headers.delete('host');
+  const ip = request.headers.get('CF-Connecting-IP') ?? '';
+  headers.set('X-Forwarded-Host', host);
+  headers.set('X-Forwarded-Proto', 'https');
+  if (ip) {
+    headers.set('X-Real-IP', ip);
+    headers.set('X-Forwarded-For', ip);
+  }
+  // 让用户的后端知道「访问者实际访问的是哪个域名」
+  headers.set('X-Original-Host', host);
+
+  const init: RequestInit = { method: request.method, headers, redirect: 'manual' };
+  if (request.method !== 'GET' && request.method !== 'HEAD' && request.body) {
+    init.body = request.body;
+  }
+
+  let resp: Response;
+  try {
+    resp = await fetch(outUrl.toString(), init);
+  } catch (e) {
+    return new Response(
+      '<!doctype html><meta charset="utf-8"><title>上游无响应</title>' +
+        '<body style="font-family:system-ui;background:#f6f1e6;color:#1c1712;padding:24px">' +
+        '<h2>无法连接到目标服务</h2><p style="color:#5b5147;line-height:1.8">' +
+        '目标 Workers/Pages 没有响应，可能已被删除、改名或暂停。</p><pre style="white-space:pre-wrap;color:#8a7f72">' +
+        escapeHtml((e as Error)?.message ?? String(e)) +
+        '</pre></body>',
+      { status: 502, headers: { 'Content-Type': 'text/html; charset=utf-8', 'Cache-Control': 'no-store' } },
+    );
+  }
+
+  // 非重定向：原样透传，绝不重建 Response —— 避免破坏 content-length / 内容编码。
+  const loc = resp.headers.get('Location');
+  if (!loc) return resp;
+
+  // 重定向：把 Location 从目标主机改回用户看到的域名，否则浏览器会被甩到
+  // xxx.workers.dev 上（地址栏暴露且跨域）。
+  const outHeaders = new Headers(resp.headers);
+  outHeaders.set('Location', rewriteLocation(loc, outUrl, base.host));
+  // body 重新包装后长度不再可信，交给运行时按 chunked 处理。
+  outHeaders.delete('content-length');
+  return new Response(resp.body, { status: resp.status, statusText: resp.statusText, headers: outHeaders });
+}
+
+/** 读取卡槽的反代目标；迁移未执行时返回 null，保证平台在迁移前也能正常跑 */
+async function readProxyTarget(env: Env, subdomainId: number): Promise<string | null> {
+  try {
+    const row = await env.DB.prepare('SELECT proxy_target FROM subdomains WHERE id = ?1')
+      .bind(subdomainId)
+      .first<{ proxy_target: string | null }>();
+    return row?.proxy_target ?? null;
+  } catch {
+    return null;
+  }
+}
+
+/** 检测泛解析记录是否已配置；查不出来时返回 false，避免误报吓到用户 */
+async function wildcardRecordMissing(env: Env): Promise<boolean> {
+  try {
+    const cf = new CfDns(env.CF_API_TOKEN, env.CF_ZONE_ID);
+    const recs = await cf.listByName(`*.${env.ROOT_DOMAIN}`);
+    return recs.length === 0;
+  } catch {
+    return false;
+  }
+}
+
+/** 按 Host 分发子域名请求 */
+async function handleProxyDispatch(request: Request, env: Env, label: string, host: string): Promise<Response> {
+  let slot: { id: number; proxy_target: string | null; expires_at: number | null } | null = null;
+  try {
+    slot = await env.DB.prepare('SELECT id, proxy_target, expires_at FROM subdomains WHERE name = ?1 LIMIT 1')
+      .bind(label)
+      .first<{ id: number; proxy_target: string | null; expires_at: number | null }>();
+  } catch (e) {
+    console.error('反代查询失败:', e);
+    return landingPage(env, host, 'idle');
+  }
+
+  if (!slot) return landingPage(env, host, 'unregistered');
+  if ((slot.expires_at ?? 0) <= Date.now()) return landingPage(env, host, 'expired');
+  if (!slot.proxy_target) return landingPage(env, host, 'idle');
+
+  return await proxyTo(slot.proxy_target, request, host);
+}
+
+/** 开启/更新反代：POST /api/slots/:id/proxy */
+async function handleSetProxy(request: Request, env: Env, path: string): Promise<Response> {
+  const user = await requireUser(request, env);
+  const m = path.match(/^\/api\/slots\/(\d+)\/proxy$/);
+  if (!m) return json({ error: 'not found' }, 404);
+  const id = Number(m[1]);
+  const slot = await env.DB.prepare('SELECT id, name FROM subdomains WHERE id = ?1 AND user_id = ?2')
+    .bind(id, user.id)
+    .first<{ id: number; name: string }>();
+  if (!slot) return json({ error: '卡槽不存在或无权操作' }, 404);
+
+  const body = await readJson(request);
+  const raw = String(body?.target ?? '').trim();
+  const verr = validateProxyTarget(raw, env.ROOT_DOMAIN);
+  if (verr) return json({ error: verr }, 400);
+  const target = normalizeProxyTarget(raw);
+
+  // DNS 记录与反代互斥：有记录时请求根本不会走到 Worker（解析直接指向别处），
+  // 反代形同虚设，用户会以为坏了 —— 所以这里直接拦住并说清楚。
+  const rec = await env.DB.prepare('SELECT type, value FROM records WHERE subdomain_id = ?1')
+    .bind(id)
+    .first<{ type: string; value: string }>();
+  if (rec) {
+    return json(
+      { error: `该子域名已设置 ${rec.type} 记录（${rec.value}），与反代互斥。请先删除记录，再开启反代。` },
+      409,
+    );
+  }
+
+  await env.DB.prepare('UPDATE subdomains SET proxy_target = ?1, updated_at = ?2 WHERE id = ?3')
+    .bind(target, new Date().toISOString(), id)
+    .run();
+
+  const missing = await wildcardRecordMissing(env);
+  return json({
+    ok: true,
+    name: slot.name,
+    fqdn: `${slot.name}.${env.ROOT_DOMAIN}`,
+    target,
+    warning: missing
+      ? `尚未检测到 *.${env.ROOT_DOMAIN} 的泛解析记录，子域名无法解析到平台。请联系管理员添加 AAAA *.${env.ROOT_DOMAIN} → 100::（已代理 / 橙云）。`
+      : undefined,
+  });
+}
+
+/** 关闭反代：DELETE /api/slots/:id/proxy */
+async function handleDeleteProxy(request: Request, env: Env, path: string): Promise<Response> {
+  const user = await requireUser(request, env);
+  const m = path.match(/^\/api\/slots\/(\d+)\/proxy$/);
+  if (!m) return json({ error: 'not found' }, 404);
+  const id = Number(m[1]);
+  const slot = await env.DB.prepare('SELECT id FROM subdomains WHERE id = ?1 AND user_id = ?2')
+    .bind(id, user.id)
+    .first();
+  if (!slot) return json({ error: '卡槽不存在或无权操作' }, 404);
+  await env.DB.prepare('UPDATE subdomains SET proxy_target = NULL, updated_at = ?1 WHERE id = ?2')
+    .bind(new Date().toISOString(), id)
+    .run();
+  return json({ ok: true });
+}
+
 // ---------- 入口 ----------
 export default {
   async fetch(request: Request, env: Env): Promise<Response> {
     try {
       const url = new URL(request.url);
       const path = url.pathname;
+
+      // 反代分发：*.fblog.cyou 的访问交给用户登记的 Workers/Pages；
+      // 平台自身入口（dns./www./根域）不参与，继续走下面的界面与 API。
+      const rootDomain = (env.ROOT_DOMAIN ?? '').toLowerCase();
+      const host = url.hostname.toLowerCase();
+      if (rootDomain && host !== rootDomain && host.endsWith('.' + rootDomain)) {
+        const label = host.slice(0, host.length - rootDomain.length - 1);
+        if (!PLATFORM_LABELS.has(label)) {
+          return await handleProxyDispatch(request, env, label, host);
+        }
+      }
 
       // 静态资源（主页、独立页、robots、sitemap 等）：直接透传原始请求，
       // 由 assets 运行时处理干净 URL（/ → index.html、/how → how.html 等）
@@ -842,6 +1098,12 @@ export default {
       let mm: RegExpMatchArray | null;
       if (request.method === 'POST' && (mm = path.match(/^\/api\/slots\/(\d+)\/record$/))) {
         return await handleSetRecord(request, env, path);
+      }
+      if (request.method === 'POST' && (mm = path.match(/^\/api\/slots\/(\d+)\/proxy$/))) {
+        return await handleSetProxy(request, env, path);
+      }
+      if (request.method === 'DELETE' && (mm = path.match(/^\/api\/slots\/(\d+)\/proxy$/))) {
+        return await handleDeleteProxy(request, env, path);
       }
       if (request.method === 'DELETE' && (mm = path.match(/^\/api\/slots\/(\d+)\/record$/))) {
         return await handleDeleteRecord(request, env, path);

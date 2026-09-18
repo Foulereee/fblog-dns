@@ -62,13 +62,22 @@
   </ul>
 
   <h2>部署 Cloudflare Workers / Pages（函数 / 页面）</h2>
-  <p>想把 <code>xxx.fblog.cyou</code> 直接挂到你自己的 Cloudflare Workers（函数）或 Pages（静态页面）上？这是 Cloudflare 的跨账号自定义域名（CNAME setup），免费、无需迁移 fblog.cyou 的 NS：</p>
+  <p>想把 <code>xxx.fblog.cyou</code> 直接挂到你自己的 Cloudflare Workers（函数）或 Pages（静态页面）上？<b>推荐用平台反代</b>，免费账号也能用，而且代码和部署都留在你自己账号里：</p>
   <ol>
-    <li>在<b>你自己的</b> Cloudflare 账号创建 Workers 或 Pages 项目；</li>
-    <li>在项目里进入 <b>自定义域名 / Custom domains</b>，添加 <code>xxx.fblog.cyou</code>，Cloudflare 会给你一个 <b>CNAME 目标</b>（形如 <code>xxx.fblog.cyou.cdn.cloudflare.net</code>）；</li>
-    <li>回到本平台「我的子域名」，把该目标填进对应子域名的 <b>CNAME</b> 记录值，保存后 Cloudflare 会自动签发 HTTPS 证书，稍等片刻即可用 <code>https://xxx.fblog.cyou</code> 访问。</li>
+    <li>在<b>你自己的</b> Cloudflare 账号部署 Workers 或 Pages，拿到部署地址（形如 <code>my-worker.my-name.workers.dev</code> 或 <code>my-project.pages.dev</code>）；</li>
+    <li>回到本平台「我的子域名」，在对应卡槽点 <b>开启反代</b>，把该地址填进去并保存；</li>
+    <li>访问 <code>https://xxx.fblog.cyou</code> 就会转发到你的部署，之后你在自己账号里改代码、重新部署即可，平台无需任何改动。</li>
   </ol>
-  <div class="tip">普通 CNAME 只是把域名指到目标；只有走上面的「自定义域名」流程，Cloudflare 才会为 <code>xxx.fblog.cyou</code> 签发专属证书并接管访问。</div>
+  <div class="tip">反代只支持 <code>*.workers.dev</code> 和 <code>*.pages.dev</code> 目标。它与上面的 DNS 记录<b>互斥</b>——同一个子域名要么填 DNS 记录，要么开反代，二选一。</div>
+
+  <h2>关于「把子域名加进自己的 Cloudflare」</h2>
+  <p>你可能会想在自己账号里把 <code>xxx.fblog.cyou</code> 添加为一个站点，从而获得完整的 Cloudflare 能力。<b>这条路目前走不通</b>，不是平台限制，而是 Cloudflare 的产品规则：</p>
+  <ul>
+    <li>「添加站点」填子域名会被拒绝：<i>Please ensure you are providing the root domain and not any subdomains</i>；</li>
+    <li>官方给子域名的正规通路是 <b>CNAME setup</b>，但它要求 <b>Business 及以上套餐</b>，免费账号会被拒；</li>
+    <li>Cloudflare for SaaS（自定义主机名）需要联系销售开通配额，不对免费账号开放。</li>
+  </ul>
+  <p>所以别在这上面浪费时间了，直接用上面的<b>平台反代</b>即可达到同样的效果。</p>
 
   <h2>DDNS 动态解析（家庭宽带）</h2>
   <p>家庭宽带公网 IP 经常变化时，用 DDNS 自动更新。在「DDNS 管理」复制你的更新地址，配合路由器或脚本使用：</p>
