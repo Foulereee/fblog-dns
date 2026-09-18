@@ -65,7 +65,7 @@
 		"PROXY_CACHE_TTL": "30",
 		// 单个主机名每分钟允许的请求数。仅在原生 RATE_LIMITER binding 不可用时
 		// 作为兜底（内存计数，按 isolate，偏宽松）。原生 binding 的额度见下方 ratelimits。
-		"RATE_LIMIT_PER_MIN": "1000000",
+		"RATE_LIMIT_PER_MIN": "1200",
 		// 当日反代请求数超过该值时给管理员发一封告警邮件（每天最多一封）。
 		// Workers 免费额度是 100,000/天，留 20% 余量。
 		"USAGE_ALERT_THRESHOLD": "80000"
@@ -78,7 +78,7 @@
 			"name": "RATE_LIMITER",
 			"namespace_id": "1001",
 			"simple": {
-				"limit": 5,
+				"limit": 1200,
 				"period": 60
 			}
 		}
