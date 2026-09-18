@@ -3,95 +3,525 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<meta name="description" content="fblog.cyou 免费二级域名平台使用教程：如何注册、申请子域名、设置 A/AAAA/CNAME 记录、使用 DDNS 动态解析。">
+<meta name="description" content="fblog.cyou 免费二级域名平台完整使用教程：如何注册与申请子域名、A/AAAA/CNAME 记录怎么填、Cloudflare / 阿里云 / 腾讯云边缘节点部署、DDNS 动态解析与排错。">
 <title>如何使用 · fblog.cyou 免费二级域名</title>
 <meta name="robots" content="index,follow">
 <style>
-  :root { --paper:#f6f1e6; --paper2:#eee6d5; --card:#fffdf7; --ink:#1c1712; --ink-soft:#5c5343; --line:#e2d8c3; --accent:#c2410c; --radius:14px; --serif:Georgia,"Times New Roman","Songti SC","Noto Serif SC",serif; --mono:ui-monospace,Consolas,monospace; }
+  :root { --paper:#f6f1e6; --paper2:#eee6d5; --card:#fffdf7; --ink:#1c1712; --ink-soft:#5c5343; --ink-mid:#3d3527; --line:#e2d8c3; --accent:#c2410c; --ok:#15803d; --radius:14px; --serif:Georgia,"Times New Roman","Songti SC","Noto Serif SC",serif; --mono:ui-monospace,Consolas,monospace; }
   * { box-sizing:border-box; margin:0; padding:0; }
-  body { font-family:system-ui,-apple-system,"PingFang SC","Microsoft YaHei","Segoe UI",sans-serif; background:var(--paper); color:var(--ink); line-height:1.8; }
-  .wrap { max-width:800px; margin:0 auto; padding:0 22px; }
-  nav { position:sticky; top:0; background:rgba(246,241,230,.9); backdrop-filter:blur(12px); border-bottom:1px solid var(--line); }
+  html { scroll-behavior:smooth; }
+  body { font-family:system-ui,-apple-system,"PingFang SC","Microsoft YaHei","Segoe UI",sans-serif; background:var(--paper); color:var(--ink); line-height:1.85; }
+  nav.top { position:sticky; top:0; z-index:50; background:rgba(246,241,230,.9); backdrop-filter:blur(12px); border-bottom:1px solid var(--line); }
   .nav-inner { display:flex; align-items:center; justify-content:space-between; height:60px; }
+  .nav-inner, .foot-inner { max-width:1180px; margin:0 auto; padding:0 22px; }
   .logo { font-family:var(--serif); font-size:20px; font-weight:700; color:var(--ink); text-decoration:none; }
   .logo .dot { color:var(--accent); }
   .nav-links a { color:var(--ink-soft); text-decoration:none; font-size:14px; margin-left:18px; }
   .nav-links a:hover { color:var(--ink); }
-  h1 { font-family:var(--serif); font-size:34px; margin:36px 0 8px; }
-  h2 { font-family:var(--serif); font-size:22px; margin:30px 0 10px; padding-top:10px; border-top:1px solid var(--line); }
+
+  /* ---------- 布局：正文 + 右侧目录 ---------- */
+  .layout { max-width:1180px; margin:0 auto; padding:0 22px; display:grid; grid-template-columns:minmax(0,820px) 250px; gap:44px; align-items:start; justify-content:center; }
+  .layout.toc-collapsed { grid-template-columns:minmax(0,820px) 46px; }
+  main { min-width:0; padding-bottom:20px; }
+
+  /* ---------- 右侧可收起目录 ---------- */
+  .toc { position:sticky; top:76px; background:var(--card); border:1px solid var(--line); border-radius:12px; padding:14px 0; max-height:calc(100vh - 100px); overflow-y:auto; font-size:13.5px; transition:padding .18s; }
+  .toc-head { display:flex; align-items:center; justify-content:space-between; gap:8px; padding:0 14px 10px; border-bottom:1px solid var(--line); }
+  .toc-title { font-family:var(--serif); font-size:15px; color:var(--ink); white-space:nowrap; }
+  .toc-toggle { flex:0 0 auto; background:transparent; border:1px solid var(--line); border-radius:7px; width:26px; height:26px; line-height:1; cursor:pointer; color:var(--ink-soft); font-size:12px; transition:all .15s; }
+  .toc-toggle:hover { border-color:var(--ink); color:var(--ink); }
+  .toc-list, .toc-list ol { list-style:none; padding:0; margin:0; }
+  .toc-list { padding-top:8px; }
+  .toc-list a { display:block; padding:5px 14px; color:var(--ink-soft); text-decoration:none; border-left:2px solid transparent; transition:background .15s, color .15s, border-color .15s; }
+  .toc-list a:hover { color:var(--ink); background:var(--paper2); }
+  .toc-list a.active { color:var(--accent); border-left-color:var(--accent); font-weight:600; background:rgba(194,65,12,.06); }
+  .toc-list > li > a { font-weight:600; color:var(--ink); }
+  .toc-list ol a { padding-left:30px; font-size:13px; }
+  .toc.collapsed { padding:8px; }
+  .toc.collapsed .toc-title, .toc.collapsed .toc-list { display:none; }
+  .toc.collapsed .toc-head { padding:0; border-bottom:none; justify-content:center; }
+
+  /* ---------- 正文排版 ---------- */
+  h1 { font-family:var(--serif); font-size:34px; margin:36px 0 6px; }
+  .lede { color:var(--ink-soft); font-size:15.5px; margin-bottom:8px; }
+  h2 { font-family:var(--serif); font-size:23px; margin:38px 0 12px; padding-top:12px; border-top:1px solid var(--line); scroll-margin-top:76px; }
+  h3 { font-family:var(--serif); font-size:17.5px; margin:26px 0 8px; color:var(--ink); scroll-margin-top:76px; }
+  h4 { font-size:15px; margin:18px 0 6px; color:var(--ink); }
   p, li { color:var(--ink-soft); font-size:15px; }
   ul, ol { padding-left:22px; margin:10px 0; }
   li { margin:6px 0; }
-  code { background:var(--paper2); border:1px solid var(--line); border-radius:6px; padding:2px 8px; font-family:var(--mono); font-size:13.5px; color:var(--ink); }
-  .tip { background:var(--card); border:1px solid var(--line); border-left:4px solid var(--accent); border-radius:8px; padding:14px 18px; margin:14px 0; }
-  footer { border-top:1px solid var(--line); margin-top:48px; padding:26px 0 40px; text-align:center; color:var(--ink-soft); font-size:13px; }
-  footer a { color:var(--accent); text-decoration:none; }
+  a { color:var(--accent); }
+  code { background:var(--paper2); border:1px solid var(--line); border-radius:6px; padding:2px 8px; font-family:var(--mono); font-size:13.5px; color:var(--ink); word-break:break-all; }
+  pre { background:#2a241d; color:#f2ead9; border-radius:10px; padding:14px 16px; margin:12px 0; overflow-x:auto; font-family:var(--mono); font-size:13px; line-height:1.7; }
+  pre code { background:none; border:none; padding:0; color:inherit; font-size:13px; }
+  .tip { background:var(--card); border:1px solid var(--line); border-left:4px solid var(--accent); border-radius:8px; padding:14px 18px; margin:16px 0; }
+  .tip.warn { border-left-color:#b45309; }
+  .tip.ok { border-left-color:var(--ok); }
+  .tip p, .tip li { font-size:14px; }
+  .tip > b:first-child { display:block; margin-bottom:4px; color:var(--ink); }
+  table { width:100%; border-collapse:collapse; margin:14px 0; font-size:14px; }
+  th, td { border:1px solid var(--line); padding:9px 12px; text-align:left; vertical-align:top; color:var(--ink-soft); }
+  th { background:var(--paper2); color:var(--ink); font-weight:600; white-space:nowrap; }
+  .docs { font-size:13.5px; margin:10px 0 0; padding:10px 14px; background:var(--paper2); border-radius:8px; }
+  .docs b { color:var(--ink); }
+  .docs a { margin-right:14px; white-space:nowrap; }
+
+  /* ---------- 页脚 ---------- */
+  footer { border-top:1px solid var(--line); margin-top:56px; padding:26px 0 40px; text-align:center; color:var(--ink-soft); font-size:13px; }
+  .foot-line { display:flex; flex-wrap:wrap; align-items:center; justify-content:center; gap:6px 10px; }
+  footer a { color:var(--ink-mid); text-decoration:underline; text-decoration-color:rgba(92,83,67,.4); text-underline-offset:3px; transition:color .15s, text-decoration-color .15s; }
+  footer a:hover { color:var(--ink); text-decoration-color:var(--ink); }
+  .foot-sep { opacity:.55; }
+
+  /* ---------- 窄屏：目录变成右下角浮动按钮 ---------- */
+  @media (max-width:1079px) {
+    .layout, .layout.toc-collapsed { grid-template-columns:minmax(0,1fr); }
+    .toc { position:fixed; right:14px; bottom:14px; top:auto; z-index:60; width:min(300px, calc(100vw - 28px)); max-height:min(62vh, 440px); box-shadow:0 16px 44px -14px rgba(28,23,18,.42); }
+    .toc.collapsed { width:auto; border-radius:10px; }
+  }
 </style>
 </head>
 <body>
-<nav><div class="wrap nav-inner">
+<nav class="top"><div class="nav-inner">
   <a class="logo" href="/">fblog<span class="dot">.cyou</span></a>
-  <div class="nav-links"><a href="/">首页</a><a href="/rules">使用规则</a></div>
+  <div class="nav-links"><a href="/">首页</a><a href="/rules">使用规则</a><a href="/terms">用户协议</a></div>
 </div></nav>
 
-<div class="wrap">
+<div class="layout" id="layout">
+<main>
   <h1>如何使用</h1>
-  <p>三步即可拥有一个免费的 <code>xxx.fblog.cyou</code> 二级域名。</p>
+  <p class="lede">从注册账号到把 <code>xxx.fblog.cyou</code> 真正跑起来 —— 包含 A / AAAA / CNAME 记录怎么填，以及 Cloudflare、阿里云、腾讯云三家边缘节点的部署教程。</p>
+  <p class="lede">页面右侧（手机上是右下角）有目录，可以随时收起。</p>
 
-  <h2>第一步：注册账号</h2>
+  <!-- ============================ 如何申请 ============================ -->
+  <h2 id="apply">如何申请</h2>
+  <p>整个申请流程只有三步：<b>注册账号 → 占用前缀 → 设置记录</b>。前两步占用不超过一分钟，第三步决定你的域名最终指向哪里。</p>
+
+  <h3 id="apply-register">1. 注册账号</h3>
   <ol>
-    <li>打开 <a href="/" style="color:var(--accent)">dns.fblog.cyou</a>，点击右上角「免费注册」；</li>
-    <li>填写用户名、邮箱、密码，勾选同意《使用规则》与《用户协议与免责声明》；</li>
-    <li>点击「发送验证码」，去邮箱查收 6 位验证码并输入，完成注册。</li>
+    <li>打开 <a href="/">dns.fblog.cyou</a>，点右上角「免费注册」；</li>
+    <li>填写<b>用户名、邮箱、密码</b>，勾选同意《使用规则》与《用户协议与免责声明》；</li>
+    <li>点「发送验证码」，去邮箱查收一封含 <b>6 位验证码</b>的邮件；</li>
+    <li>把验证码填进去，点确认，注册完成并自动登录。</li>
   </ol>
+  <div class="tip warn"><b>没收到验证码？</b>
+    <p>先去<b>垃圾邮件 / 广告邮件</b>文件夹找 —— 平台用的是自建发信通道，第一次收到时很容易被邮箱判成垃圾。垃圾箱里也没有的话，等 1–2 分钟后点「重发验证码」。验证码 <b>10 分钟内有效</b>，过期重新发即可。</p>
+  </div>
 
-  <h2>第二步：申请占用子域名</h2>
+  <h3 id="apply-claim">2. 申请占用子域名</h3>
   <ol>
-    <li>登录后进入「申请子域名」；</li>
-    <li>输入想要的前缀（如 <code>myblog</code>），系统会实时检测是否可用；</li>
-    <li>点击「申请占用」，即可占有 <code>myblog.fblog.cyou</code>。</li>
+    <li>登录后进入左侧「<b>申请子域名</b>」；</li>
+    <li>在输入框填你想要的前缀，比如 <code>myblog</code>；系统会<b>实时检测</b>是否可用；</li>
+    <li>看到绿色提示后点「<b>申请占用</b>」，你就拥有了 <code>myblog.fblog.cyou</code>。</li>
   </ol>
-  <div class="tip">申请仅占用前缀，此时还不设置记录。每个账号默认 2 个卡槽，完成 GitHub 星标可再解锁 3 个（合计 5 个）；需要更多请联系管理员。</div>
-
-  <h2>第三步：设置 DNS 记录</h2>
-  <p>在「我的子域名」中找到刚申请的域名，选择记录类型并填写目标地址：</p>
+  <h4>前缀命名规则</h4>
   <ul>
-    <li><code>A</code>：指向 IPv4 地址，例如 <code>1.2.3.4</code>；</li>
-    <li><code>AAAA</code>：指向 IPv6 地址，例如 <code>2001:db8::1</code>；</li>
-    <li><code>CNAME</code>：指向另一个域名，例如 <code>example.com</code>。</li>
+    <li>只能用小写字母 <code>a-z</code>、数字 <code>0-9</code> 和连字符 <code>-</code>；</li>
+    <li>不能以连字符开头或结尾；</li>
+    <li>长度 1–63 个字符；</li>
+    <li>平台自用与常见系统名（如 <code>www</code>、<code>api</code>、<code>mail</code>、<code>dns</code>、<code>admin</code> 等）属于<b>保留字</b>，不允许占用。</li>
+  </ul>
+  <div class="tip"><b>申请只是「占位」</b>
+    <p>这一步只锁定前缀，<b>此时域名还不会解析</b>。要让它真正能用，必须继续做下面「如何使用」里的任意一种配置（DNS 记录或平台反代）。</p>
+  </div>
+
+  <h3 id="apply-slots">3. 卡槽与配额</h3>
+  <p>每个子域名占用一个「卡槽」。规则如下：</p>
+  <table>
+    <tr><th>阶段</th><th>可用卡槽</th><th>怎么拿到</th></tr>
+    <tr><td>新账号</td><td>2 个</td><td>注册即有，无需任何条件</td></tr>
+    <tr><td>完成 GitHub 星标</td><td>5 个</td><td>给项目点星后由管理员标记解锁</td></tr>
+    <tr><td>更多</td><td>按需开通</td><td>联系管理员申请</td></tr>
+  </table>
+  <p>每个二级域名的<b>有效期是 1 年</b>；剩余时间 ≤ 6 个月时可以点「续期 1 年」；到期未续会自动释放，前缀重新开放给别人申请。</p>
+
+  <h3 id="apply-faq">4. 申请环节常见问题</h3>
+  <ul>
+    <li><b>提示前缀已被占用</b> —— 换一个。已被占用的前缀即使原主人从没配置过记录，也要等他释放或到期。</li>
+    <li><b>提示这是保留字</b> —— 该前缀属于平台自用或常见系统名，避免和邮件、DNS 等系统记录冲突，请换一个。</li>
+    <li><b>卡槽满了</b> —— 到「我的子域名」确认有没有闲置的可以先释放；确实需要更多就联系管理员。</li>
+    <li><b>申请后能改前缀吗</b> —— 不能。想换就先把旧的释放掉，再重新申请一个新的（注意释放后前缀会被别人抢走）。</li>
   </ul>
 
-  <h2>部署 Cloudflare Workers / Pages（函数 / 页面）</h2>
-  <p>想把 <code>xxx.fblog.cyou</code> 直接挂到你自己的 Cloudflare Workers（函数）或 Pages（静态页面）上？<b>推荐用平台反代</b>，免费账号也能用，而且代码和部署都留在你自己账号里：</p>
+  <!-- ============================ 如何使用 ============================ -->
+  <h2 id="use">如何使用</h2>
+  <p>让子域名「能用」有两条互斥的路线，<b>每个卡槽二选一</b>：</p>
+  <table>
+    <tr><th></th><th>路线 A：DNS 记录</th><th>路线 B：平台反代</th></tr>
+    <tr><td>解析去向</td><td>直接指向你填的地址</td><td>指向 Cloudflare 边缘节点</td></tr>
+    <tr><td>是否经过 Cloudflare 代理</td><td>否（灰云，直连）</td><td>是（橙云）</td></tr>
+    <tr><td>HTTPS 证书</td><td><b>你自己在服务器上配</b></td><td>Cloudflare 自动提供</td></tr>
+    <tr><td>对源站的要求</td><td>要有公网 IP 且开放 80/443</td><td>无需自己服务器，目标是 Serverless 域名</td></tr>
+    <tr><td>目标限制</td><td>任意 IPv4 / IPv6 / 域名</td><td><b>只支持 4 类后缀</b>（见下）</td></tr>
+    <tr><td>适合</td><td>VPS、家用服务器、已有网站</td><td>Workers / Pages / 函数计算 / 云函数</td></tr>
+  </table>
+  <div class="tip warn"><b>两条路不能同时用</b>
+    <p>同一个卡槽要么填 DNS 记录，要么开反代。已经开了反代再想填记录，平台会提示「与 DNS 记录互斥」，需要先关闭反代。</p>
+  </div>
+
+  <h3 id="use-types">先认识三种记录类型</h3>
+  <p>在「我的子域名」里给卡槽设置记录时，你会看到三种类型，它们的作用完全不同：</p>
+  <table>
+    <tr><th>类型</th><th>指向什么</th><th>填写示例</th><th>典型场景</th></tr>
+    <tr><td><code>A</code></td><td>一个 IPv4 地址</td><td><code>203.0.113.10</code></td><td>有固定公网 IPv4 的 VPS / 云服务器</td></tr>
+    <tr><td><code>AAAA</code></td><td>一个 IPv6 地址</td><td><code>2001:db8::1</code></td><td>有 IPv6 的服务器，或开了 IPv6 的家庭宽带</td></tr>
+    <tr><td><code>CNAME</code></td><td>另一个域名</td><td><code>myapp.example.com</code></td><td>指向 CDN、边缘平台，或别人给你的域名</td></tr>
+  </table>
+  <div class="tip"><b>平台创建的记录是「仅 DNS」（灰云）</b>
+    <p>也就是说：<b>域名会直接解析到你填的地址，不经过 Cloudflare 代理</b>。Cloudflare 不会替你挡攻击、也不会替你签证书 —— HTTPS 需要你在自己服务器上配置。这是刻意的设计：让记录行为可预期，你自己完全掌控源站。</p>
+  </div>
+
+  <h3 id="use-a">A 记录：指向 IPv4 地址</h3>
+  <p><b>适用</b>：你有一台带固定公网 IPv4 的服务器（VPS、云主机、独立服务器）。</p>
+  <h4>操作步骤</h4>
   <ol>
-    <li>在<b>你自己的</b> Cloudflare 账号部署 Workers 或 Pages，拿到部署地址（形如 <code>my-worker.my-name.workers.dev</code> 或 <code>my-project.pages.dev</code>）；</li>
-    <li>回到本平台「我的子域名」，在对应卡槽点 <b>开启反代</b>，把该地址填进去并保存；</li>
-    <li>访问 <code>https://xxx.fblog.cyou</code> 就会转发到你的部署，之后你在自己账号里改代码、重新部署即可，平台无需任何改动。</li>
+    <li>确认服务器的公网 IPv4，例如在服务器上执行：
+      <pre><code>curl -4 ifconfig.me</code></pre>
+    </li>
+    <li>确认 80 / 443 端口对外开放（云厂商还要在<b>安全组 / 防火墙</b>里放行）；</li>
+    <li>回到平台「我的子域名」，在该卡槽选择类型 <code>A</code>，值填那个 IPv4，点保存；</li>
+    <li>等待生效（平台用自动 TTL，通常几分钟内，最长不超过 10 分钟）。</li>
   </ol>
-  <div class="tip">反代只支持这几类目标：<code>*.workers.dev</code>、<code>*.pages.dev</code>（Cloudflare）、<code>*.fcapp.run</code>（阿里云函数计算）、<code>*.tencentscf.com</code>（腾讯云云函数）。<b>不支持任意网址</b>，比如填 <code>https://baidu.com</code> 会被拒绝 —— 否则平台就成了任人使用的公开反向代理。它与上面的 DNS 记录<b>互斥</b>——同一个子域名要么填 DNS 记录，要么开反代，二选一。</div>
+  <h4>HTTPS 证书要自己配</h4>
+  <p>因为记录是灰云直连，<code>https://你的域名</code> 的证书由<b>你的服务器</b>提供。最省事的做法是 Let's Encrypt：</p>
+  <pre><code># 以 Nginx + certbot 为例
+sudo apt install certbot python3-certbot-nginx
+sudo certbot --nginx -d myblog.fblog.cyou</code></pre>
+  <p>certbot 走 HTTP-01 校验，需要你的 80 端口能从公网访问、且域名已经解析到这台机器 —— 所以先把 A 记录配好，再去签证书。</p>
+  <div class="tip warn"><b>常见坑</b>
+    <ul>
+      <li>填了内网地址（<code>192.168.x.x</code>、<code>10.x.x.x</code>）—— 外网无法访问，等于没配；</li>
+      <li>服务器防火墙没放行 80/443 —— 解析正常但打不开；</li>
+      <li>家庭宽带的 IPv4 是动态的 —— 重启光猫就变，请改用 <a href="#ddns">DDNS</a>。</li>
+    </ul>
+  </div>
+  <p class="docs"><b>官方文档：</b><a href="https://developers.cloudflare.com/dns/manage-dns-records/how-to/create-dns-records/" target="_blank" rel="noopener">Cloudflare · 创建 DNS 记录</a><a href="https://help.aliyun.com/zh/dns/user-guide/add-dns-records" target="_blank" rel="noopener">阿里云 · 添加解析记录</a><a href="https://docs.dnspod.cn/dns/" target="_blank" rel="noopener">DNSPod · 解析记录文档</a></p>
 
-  <h2>关于「把子域名加进自己的 Cloudflare」</h2>
-  <p>你可能会想在自己账号里把 <code>xxx.fblog.cyou</code> 添加为一个站点，从而获得完整的 Cloudflare 能力。<b>这条路目前走不通</b>，不是平台限制，而是 Cloudflare 的产品规则：</p>
+  <h3 id="use-aaaa">AAAA 记录：指向 IPv6 地址</h3>
+  <p><b>适用</b>：服务器只有 IPv6、或者你想让访客优先走 IPv6。</p>
+  <h4>操作步骤</h4>
+  <ol>
+    <li>确认服务器的 IPv6 地址：
+      <pre><code>curl -6 ifconfig.me</code></pre>
+    </li>
+    <li>在平台该卡槽选择类型 <code>AAAA</code>，值填 IPv6 地址（例如 <code>2001:db8::1</code>）；</li>
+    <li>服务器防火墙同样要放行 80 / 443。</li>
+  </ol>
+  <div class="tip warn"><b>IPv6 的三个现实问题</b>
+    <ul>
+      <li><b>不是所有访客都有 IPv6</b>。只配 AAAA 的话，纯 IPv4 的网络会打不开 —— 建议 A 和 AAAA 各配一个（不同卡槽），或者确认你的用户群 IPv6 普及率足够高；</li>
+      <li><b>家庭宽带的 IPv6 前缀会变</b>。运营商通常只保证前缀在租期内稳定，重启光猫可能整段变化，这种情况更适合 DDNS；</li>
+      <li><b>地址要写完整或正确缩写</b>，不要带端口、不要带方括号。</li>
+    </ul>
+  </div>
+  <p class="docs"><b>官方文档：</b><a href="https://developers.cloudflare.com/dns/" target="_blank" rel="noopener">Cloudflare · DNS 文档</a><a href="https://help.aliyun.com/zh/dns/" target="_blank" rel="noopener">阿里云 · 云解析 DNS</a></p>
+
+  <h3 id="use-cname">CNAME 记录：指向另一个域名</h3>
+  <p><b>适用</b>：目标不是 IP，而是一个域名 —— 比如 CDN 给你的加速域名、边缘平台分配的子域、或者朋友分享给你的地址。</p>
+  <h4>操作步骤</h4>
+  <ol>
+    <li>拿到目标域名（例如某 CDN 控制台里显示的 <code>xxx.cdn-provider.com</code>）；</li>
+    <li>在平台该卡槽选择类型 <code>CNAME</code>，值填<b>纯域名</b>，<b>不要</b>带 <code>https://</code>、不要带路径或结尾的点；</li>
+    <li>保存后等待生效。</li>
+  </ol>
+  <h4>CNAME 的两个硬性限制</h4>
   <ul>
-    <li>「添加站点」填子域名会被拒绝：<i>Please ensure you are providing the root domain and not any subdomains</i>；</li>
-    <li>官方给子域名的正规通路是 <b>CNAME setup</b>，但它要求 <b>Business 及以上套餐</b>，免费账号会被拒；</li>
-    <li>Cloudflare for SaaS（自定义主机名）需要联系销售开通配额，不对免费账号开放。</li>
+    <li><b>不能和同名的其他记录共存</b>。这是 DNS 协议规定 —— 一个名字要么是 CNAME，要么是别的记录，不能既是又是。所以一个卡槽填了 CNAME 就不能再填 A；</li>
+    <li><b>不能用在根域名上</b>。本平台给的是子域名（<code>xxx.fblog.cyou</code>），没有这个问题。</li>
   </ul>
-  <p>所以别在这上面浪费时间了，直接用上面的<b>平台反代</b>即可达到同样的效果。</p>
+  <div class="tip"><b>一个容易被忽略的点：CNAME 目标那边也要认你的域名</b>
+    <p>CNAME 只是把「你的域名」指向「他的域名」。目标那侧（CDN、边缘平台）必须<b>已经把 <code>xxx.fblog.cyou</code> 加进它的域名列表</b>，否则对方服务器收到请求时不知道该怎么处理，会直接报错或返回默认站点。这是 CNAME 配置里最常见的失败原因。</p>
+  </div>
+  <p class="docs"><b>官方文档：</b><a href="https://developers.cloudflare.com/dns/manage-dns-records/how-to/create-dns-records/" target="_blank" rel="noopener">Cloudflare · 创建 DNS 记录</a><a href="https://cloud.tencent.com/document/product/302" target="_blank" rel="noopener">腾讯云 · DNSPod 文档</a></p>
 
-  <h2>DDNS 动态解析（家庭宽带）</h2>
-  <p>家庭宽带公网 IP 经常变化时，用 DDNS 自动更新。在「DDNS 管理」复制你的更新地址，配合路由器或脚本使用：</p>
+  <!-- ---------- 边缘节点教程 ---------- -->
+  <h3 id="edge-cloudflare">边缘节点教程 · Cloudflare</h3>
+  <p>Cloudflare 的边缘网络覆盖最广、免费额度最实在，而且 <b>Workers（函数）和 Pages（静态页面）在免费套餐下就能用</b>。如果你只是想挂一个页面或一个小 API，这是最省事的选择。</p>
+  <h4>部署步骤</h4>
+  <ol>
+    <li>到 <a href="https://dash.cloudflare.com/" target="_blank" rel="noopener">Cloudflare 控制台</a>注册/登录（免费账号即可）；</li>
+    <li>创建项目 —— 命令行方式（推荐，便于后续更新）：
+      <pre><code>npm create cloudflare@latest my-app
+cd my-app
+npx wrangler deploy</code></pre>
+      也可以直接在控制台里点 <b>Workers &amp; Pages → Create</b> 用网页模板创建，或者把 GitHub 仓库连到 Pages 做自动构建；
+    </li>
+    <li>部署完成后你会拿到一个默认地址，形如：
+      <ul>
+        <li>Workers：<code>my-app.你的子域.workers.dev</code></li>
+        <li>Pages：<code>my-project.pages.dev</code></li>
+      </ul>
+    </li>
+    <li><b>回到本平台接线</b>：到「我的子域名」→ 该卡槽点「<b>开启反代</b>」→ 把这个默认地址填进去 → 保存；</li>
+    <li>访问 <code>https://xxx.fblog.cyou</code>，请求会被转发到你的 Worker / Pages。之后你在自己账号里改代码、重新部署，平台侧<b>不需要任何改动</b>。</li>
+  </ol>
+  <div class="tip ok"><b>为什么推荐用平台反代，而不是自定义域</b>
+    <p>Cloudflare 的 Workers 自定义域要求域名在<b>同一个账号</b>里，而 <code>fblog.cyou</code> 在平台账号下，所以你在自己账号里加不了它。平台反代正好绕开这个限制，而且 <code>xxx.fblog.cyou</code> 的 HTTPS 证书由平台的 Cloudflare 边缘自动签发，你什么都不用配。</p>
+  </div>
+  <p class="docs"><b>官方文档：</b><a href="https://developers.cloudflare.com/workers/get-started/guide/" target="_blank" rel="noopener">Workers 快速上手</a><a href="https://developers.cloudflare.com/pages/get-started/" target="_blank" rel="noopener">Pages 快速上手</a><a href="https://developers.cloudflare.com/workers/wrangler/" target="_blank" rel="noopener">Wrangler CLI</a><a href="https://developers.cloudflare.com/workers/configuration/routing/custom-domains/" target="_blank" rel="noopener">自定义域说明</a></p>
+
+  <h3 id="edge-aliyun">边缘节点教程 · 阿里云</h3>
+  <p>阿里云这边有两个方向，按你的需求选：</p>
+  <table>
+    <tr><th>产品</th><th>是什么</th><th>和本平台怎么接</th></tr>
+    <tr><td><b>函数计算 FC</b></td><td>Serverless 计算，写个函数就有 HTTPS 地址，有免费额度</td><td><b>平台反代</b>（<code>*.fcapp.run</code>）</td></tr>
+    <tr><td><b>边缘节点服务 ENS</b></td><td>把计算下沉到运营商边缘机房，偏企业向、按量计费</td><td>看它分配的是域名还是 IP，分别用 <b>CNAME</b> 或 <b>A</b> 记录</td></tr>
+  </table>
+
+  <h4>方向一：函数计算 FC（推荐先试这个）</h4>
+  <ol>
+    <li>登录 <a href="https://fc.console.aliyun.com/" target="_blank" rel="noopener">阿里云函数计算控制台</a>，开通服务（有免费额度）；</li>
+    <li>创建函数，选择 <b>Web 函数</b>（能直接处理 HTTP 请求）或内置的示例模板；</li>
+    <li>部署后为函数<b>开启公网访问 / 配置 HTTP 触发器</b>，拿到系统分配的访问域名，形如：
+      <pre><code>https://my-func.cn-hangzhou.fcapp.run</code></pre>
+    </li>
+    <li>把域名里的 <b>主机部分</b>（<code>my-func.cn-hangzhou.fcapp.run</code>）填进平台该卡槽的「开启反代」；<b>不要带 <code>https://</code>、不要带路径</b>；</li>
+    <li>保存后访问 <code>https://xxx.fblog.cyou</code> 即可。</li>
+  </ol>
+  <div class="tip warn"><b>阿里云这边容易踩的坑</b>
+    <ul>
+      <li>FC 的函数默认可能有<b>鉴权</b>开关。如果开了签名鉴权，平台转发过去的请求会被拒（返回 401/403），需要在控制台把它关掉或改为匿名访问；</li>
+      <li>函数如果只监听特定路径（比如 <code>/invoke</code>），请确认平台转发的是根路径 —— 平台<b>原样透传</b>你访问的路径，所以你访问 <code>https://xxx.fblog.cyou/invoke</code> 才会命中；</li>
+      <li>平台白名单只认 <code>*.fcapp.run</code>。阿里云 OSS、CDN 等其他域名<b>不在白名单内</b>，会被拒绝。</li>
+    </ul>
+  </div>
+
+  <h4>方向二：边缘节点服务 ENS</h4>
+  <ol>
+    <li>在 <a href="https://help.aliyun.com/zh/ens/" target="_blank" rel="noopener">ENS 文档</a>了解计费与开通方式，到控制台创建实例并部署你的服务；</li>
+    <li>ENS 实例会提供访问方式（公网 IP 或分配的域名）；</li>
+    <li><b>如果是公网 IP</b> → 用 <b>A 记录</b>指向它，并自行配置 HTTPS 证书；<b>如果是一个域名</b> → 用 <b>CNAME 记录</b>指向它；</li>
+    <li>ENS 侧的接入配置里也要把 <code>xxx.fblog.cyou</code> 登记进去（CNAME 场景尤其重要）。</li>
+  </ol>
+  <div class="tip"><b>ENS 值不值得用</b>
+    <p>ENS 偏向企业客户，计费方式与免费额度都和 FC 不同。如果你只是想要一个能跑起来的 HTTPS 地址，<b>直接用函数计算 FC 更划算</b>；ENS 的价值在于把计算放到离用户更近的运营商机房，适合有明确低延迟诉求的业务。</p>
+  </div>
+  <p class="docs"><b>官方文档：</b><a href="https://help.aliyun.com/zh/functioncompute/fc-3-0/user-guide/quick-start" target="_blank" rel="noopener">函数计算 FC 快速入门</a><a href="https://help.aliyun.com/zh/functioncompute/fc-3-0/user-guide/create-a-web-function" target="_blank" rel="noopener">创建 Web 函数</a><a href="https://help.aliyun.com/zh/ens/" target="_blank" rel="noopener">边缘节点服务 ENS</a></p>
+
+  <h3 id="edge-tencent">边缘节点教程 · 腾讯云</h3>
+  <p>腾讯云同样是两个方向：</p>
+  <table>
+    <tr><th>产品</th><th>是什么</th><th>和本平台怎么接</th></tr>
+    <tr><td><b>云函数 SCF</b></td><td>Serverless 函数，可开启 Function URL 得到 HTTPS 地址</td><td><b>平台反代</b>（<code>*.tencentscf.com</code>）</td></tr>
+    <tr><td><b>EdgeOne（边缘安全加速平台 EO）</b></td><td>基于腾讯边缘计算节点的加速 + 安全平台，含边缘函数</td><td>接入它分配的加速域名 → 用 <b>CNAME</b></td></tr>
+  </table>
+
+  <h4>方向一：云函数 SCF（推荐先试这个）</h4>
+  <ol>
+    <li>登录 <a href="https://console.cloud.tencent.com/scf" target="_blank" rel="noopener">腾讯云云函数控制台</a>，新建函数（选「Web 函数」或自定义运行时）；</li>
+    <li>部署完成后，为该函数<b>开启 Function URL</b>（函数 URL 是腾讯云给函数分配的固定 HTTPS 入口）；</li>
+    <li>拿到形如下面的地址：
+      <pre><code>https://你的appid-你的urlid.ap-guangzhou.tencentscf.com</code></pre>
+    </li>
+    <li>把主机部分填进平台该卡槽的「开启反代」，保存；</li>
+    <li>访问 <code>https://xxx.fblog.cyou</code> 验证。</li>
+  </ol>
+  <div class="tip warn"><b>腾讯云这边容易踩的坑</b>
+    <ul>
+      <li><b>Function URL 要手动开启</b>，不开的话函数没有可直接访问的 HTTPS 地址；</li>
+      <li>注意区分 <b>Function URL（<code>*.tencentscf.com</code>）</b>和 <b>API 网关（<code>*.apigw.tencentcs.com</code>）</b> —— 平台白名单<b>只收录前者</b>。API 网关任何人都能挂，边界太宽，属于刻意排除；</li>
+      <li>函数若配置了鉴权，同样会被平台转发拦下，需要放开匿名调用或改用无需鉴权的触发方式。</li>
+    </ul>
+  </div>
+
+  <h4>方向二：EdgeOne（边缘安全加速平台 EO）</h4>
+  <ol>
+    <li>参考 <a href="https://cloud.tencent.com/document/product/1552/87601" target="_blank" rel="noopener">从零开始快速接入 EdgeOne</a>，在控制台添加你的站点；</li>
+    <li>EdgeOne 会分配一个<b>加速域名</b>给你，并在接入流程里要求你做 <b>CNAME</b> 指向；</li>
+    <li>因为 <code>fblog.cyou</code> 不在你的账号下，走不了自动接入。你可以在 EdgeOne 里<b>手动添加 <code>xxx.fblog.cyou</code> 作为自定义域名</b>，然后在<b>本平台</b>用 <b>CNAME 记录</b>指向 EdgeOne 给你的加速域名；</li>
+    <li>按 EdgeOne 的提示完成域名归属校验（通常会给你一条 TXT 记录让你去验证）；</li>
+    <li>EdgeOne 侧配置好源站（回源到你的服务器或对象存储）后即可访问。</li>
+  </ol>
+  <div class="tip"><b>EdgeOne 与平台反代是两条不同的路</b>
+    <p>EdgeOne 走的是 <b>CNAME</b>（路线 A），它<u>不</u>在平台反代的白名单里 —— 平台反代只认 <code>*.tencentscf.com</code>。所以接 EdgeOne 请用 CNAME，并且 HTTPS 证书由 EdgeOne 侧负责签发。</p>
+  </div>
+  <p class="docs"><b>官方文档：</b><a href="https://cloud.tencent.com/document/product/583" target="_blank" rel="noopener">云函数 SCF 文档</a><a href="https://cloud.tencent.com/product/scf" target="_blank" rel="noopener">云函数产品页</a><a href="https://cloud.tencent.com/document/product/1552" target="_blank" rel="noopener">EdgeOne 文档</a><a href="https://cloud.tencent.com/document/product/1552/81344" target="_blank" rel="noopener">EdgeOne 边缘函数</a></p>
+
+  <h3 id="edge-choose">三家怎么选？</h3>
+  <table>
+    <tr><th>你的需求</th><th>建议</th></tr>
+    <tr><td>挂个静态页面 / 小 API，想最快跑起来</td><td><b>Cloudflare Workers 或 Pages</b>，免费额度友好、部署最快</td></tr>
+    <tr><td>已有阿里云生态（OSS、RDS 等）</td><td><b>阿里云函数计算 FC</b>，内网互通方便</td></tr>
+    <tr><td>已有腾讯云生态</td><td><b>腾讯云云函数 SCF</b></td></tr>
+    <tr><td>需要边缘加速 + WAF 等安全能力</td><td><b>腾讯云 EdgeOne</b>，走 CNAME 接入</td></tr>
+    <tr><td>有自己服务器、要完全掌控</td><td>直接配 <b>A / AAAA 记录</b>，自己签证书</td></tr>
+  </table>
+  <div class="tip"><b>统一记住一件事</b>
+    <p>走<b>平台反代</b>的（Workers / Pages / FC / SCF），你只需要「填一个域名」；走 <b>CNAME</b> 的（EdgeOne、各类 CDN），你还必须去对方控制台把你自己的域名登记进去，两边都要配。</p>
+  </div>
+
+  <h3 id="use-verify">验证与排错</h3>
+  <p>配完之后，按这个顺序确认是否生效：</p>
+  <ol>
+    <li><b>看解析</b>：
+      <pre><code>nslookup myblog.fblog.cyou
+# 或
+dig myblog.fblog.cyou +short</code></pre>
+      返回的应该是你填的 IP，或者反代场景下 Cloudflare 的边缘 IP；
+    </li>
+    <li><b>看连通</b>：
+      <pre><code>curl -I https://myblog.fblog.cyou</code></pre>
+      期望 <code>200</code> 或 <code>301/302</code>；
+    </li>
+    <li><b>看证书</b>：浏览器地址栏是否显示锁标。DNS 记录路线下证书是你自己配的，没配就会出现证书告警。</li>
+  </ol>
+  <table>
+    <tr><th>现象</th><th>多半是</th></tr>
+    <tr><td>域名完全解析不出来</td><td>还没设置记录，或刚保存没到生效时间</td></tr>
+    <tr><td>解析对了但连不上</td><td>服务器防火墙 / 云安全组没放行 80、443</td></tr>
+    <tr><td>证书告警</td><td>DNS 记录路线没配证书，或证书不是给这个域名签的</td></tr>
+    <tr><td>反代保存被拒</td><td>目标不在白名单四类后缀内，或填了 <code>https://</code> / 路径</td></tr>
+    <tr><td>反代 502 / 1031</td><td>目标服务本身没起来，或函数开了鉴权</td></tr>
+    <tr><td>偶尔打得开、偶尔打不开</td><td>目标 IP 是动态的（家庭宽带）—— 用 DDNS</td></tr>
+  </table>
+
+  <!-- ============================ DDNS ============================ -->
+  <h2 id="ddns">DDNS 动态解析（家庭宽带）</h2>
+  <p>家庭宽带的公网 IP 会变，每次变了都要手动改记录太麻烦。平台的 DDNS 接口让你用一个固定 URL 自动更新：</p>
+  <ol>
+    <li>进入「<b>DDNS 管理</b>」，复制属于你的更新地址（含令牌，<b>请勿泄露</b>）；</li>
+    <li>把这条 URL 交给路由器、NAS 或定时脚本，定期访问一次即可。</li>
+  </ol>
+  <pre><code># 指定 IP 更新
+curl "https://dns.fblog.cyou/api/ddns?token=你的令牌&ip=1.2.3.4"
+
+# 省略 ip 参数：自动使用请求来源的公网 IP
+curl "https://dns.fblog.cyou/api/ddns?token=你的令牌"</code></pre>
   <ul>
-    <li>curl 更新：<code>curl "https://dns.fblog.cyou/api/ddns?token=你的令牌&ip=1.2.3.4"</code></li>
-    <li>省略 <code>ip</code> 参数时自动使用你当前的公网 IP；</li>
-    <li>兼容 ddclient 等常见 DDNS 客户端。</li>
+    <li>省略 <code>ip</code> 时会用你当前的公网出口 IP，<b>多数路由器场景用这种就够了</b>；</li>
+    <li>兼容 ddclient 等常见 DDNS 客户端；</li>
+    <li>令牌泄露等于把该卡槽的记录更新权限给了别人，怀疑泄露时到「DDNS 管理」<b>重新生成</b>。</li>
   </ul>
 
-  <h2>续期规则</h2>
-  <p>每个二级域名有效期 1 年；剩余时间 ≤ 6 个月时可点击「续期 1 年」；到期未续将自动释放，前缀重新开放申请。</p>
+  <!-- ============================ 续期 ============================ -->
+  <h2 id="renew">续期与到期</h2>
+  <ul>
+    <li>每个二级域名有效期 <b>1 年</b>；</li>
+    <li>剩余时间 <b>≤ 6 个月</b>时，「我的子域名」里会出现「续期 1 年」按钮；</li>
+    <li>到期未续期会<b>自动释放</b>，前缀重新开放申请，<b>释放后无法找回</b>；</li>
+    <li>建议在手机日历上给到期日前一个月设个提醒。</li>
+  </ul>
+  <p>另外，记录与反代配置都会保留在卡槽上 —— 续期只延长有效期，不需要重新配置。</p>
+
+  <!-- ============================ 兜底 ============================ -->
+  <h2 id="faq">还是不行？</h2>
+  <ul>
+    <li>先对照上面「验证与排错」的表格自查，多数问题能直接定位；</li>
+    <li>涉及账号、卡槽、被误判滥用的问题，请联系管理员；</li>
+    <li>使用前请务必读一遍 <a href="/rules">使用规则</a> 与 <a href="/terms">用户协议与免责声明</a> —— 违规域名会被回收，且可能导致整个 <code>fblog.cyou</code> 受影响。</li>
+  </ul>
+</main>
+
+<nav class="toc" id="toc" aria-label="页内目录">
+  <div class="toc-head">
+    <b class="toc-title">目录</b>
+    <button class="toc-toggle" id="toc-toggle" type="button" aria-controls="toc" aria-expanded="true" aria-label="收起目录">«</button>
+  </div>
+  <ol class="toc-list">
+    <li><a href="#apply">如何申请</a>
+      <ol>
+        <li><a href="#apply-register">注册账号</a></li>
+        <li><a href="#apply-claim">申请子域名</a></li>
+        <li><a href="#apply-slots">卡槽与配额</a></li>
+        <li><a href="#apply-faq">申请常见问题</a></li>
+      </ol>
+    </li>
+    <li><a href="#use">如何使用</a>
+      <ol>
+        <li><a href="#use-types">三种记录类型</a></li>
+        <li><a href="#use-a">A 记录（IPv4）</a></li>
+        <li><a href="#use-aaaa">AAAA 记录（IPv6）</a></li>
+        <li><a href="#use-cname">CNAME 记录</a></li>
+        <li><a href="#edge-cloudflare">边缘节点 · Cloudflare</a></li>
+        <li><a href="#edge-aliyun">边缘节点 · 阿里云</a></li>
+        <li><a href="#edge-tencent">边缘节点 · 腾讯云</a></li>
+        <li><a href="#edge-choose">三家怎么选</a></li>
+        <li><a href="#use-verify">验证与排错</a></li>
+      </ol>
+    </li>
+    <li><a href="#ddns">DDNS 动态解析</a></li>
+    <li><a href="#renew">续期与到期</a></li>
+    <li><a href="#faq">还是不行？</a></li>
+  </ol>
+</nav>
 </div>
 
-<footer class="wrap">本站已运营 <span id="days">—</span> 天 · <a href="https://esa.fblog.cloud" target="_blank" rel="noopener">站长博客 esa.fblog.cloud</a> · <a href="/rules">使用规则</a> · <a href="/terms">用户协议与免责声明</a></footer>
-<script>document.getElementById('days').textContent = Math.max(1, Math.floor((Date.now() - Date.UTC(2026,8,14)) / 86400000));</script>
+<footer><div class="foot-inner"><div class="foot-line">
+  <span>本站已运营 <span id="days">—</span> 天</span>
+  <span class="foot-sep">·</span>
+  <a href="https://esa.fblog.cloud" target="_blank" rel="noopener">访问站长博客</a>
+  <span class="foot-sep">·</span>
+  <a href="/rules">使用规则</a>
+  <span class="foot-sep">·</span>
+  <a href="/terms">用户协议与免责声明</a>
+</div></div></footer>
+
+<script>
+(function () {
+  document.getElementById('days').textContent = Math.max(1, Math.floor((Date.now() - Date.UTC(2026, 8, 14)) / 86400000));
+
+  var layout = document.getElementById('layout');
+  var toc = document.getElementById('toc');
+  var toggle = document.getElementById('toc-toggle');
+  if (!layout || !toc || !toggle) return;
+  var KEY = 'fblog-how-toc-collapsed';
+  var narrow = window.matchMedia('(max-width: 1079px)');
+
+  function setCollapsed(collapsed) {
+    toc.classList.toggle('collapsed', collapsed);
+    layout.classList.toggle('toc-collapsed', collapsed);
+    toggle.textContent = collapsed ? '☰' : '«';
+    toggle.setAttribute('aria-expanded', collapsed ? 'false' : 'true');
+    toggle.setAttribute('aria-label', collapsed ? '展开目录' : '收起目录');
+    try { localStorage.setItem(KEY, collapsed ? '1' : '0'); } catch (e) {}
+  }
+
+  // 窄屏默认收起（免得挡住正文）；宽屏沿用上次的选择
+  var saved = null;
+  try { saved = localStorage.getItem(KEY); } catch (e) {}
+  setCollapsed(narrow.matches ? true : saved === '1');
+
+  toggle.addEventListener('click', function () {
+    setCollapsed(!toc.classList.contains('collapsed'));
+  });
+
+  // 窄屏点完目录项自动收起，否则浮层会挡着刚跳过去的正文
+  toc.addEventListener('click', function (e) {
+    var t = e.target;
+    while (t && t !== toc && t.tagName !== 'A') t = t.parentNode;
+    if (t && t.tagName === 'A' && narrow.matches) setCollapsed(true);
+  });
+
+  // 滚动高亮当前小节
+  var links = Array.prototype.slice.call(toc.querySelectorAll('a[href^="#"]'));
+  var map = {};
+  links.forEach(function (a) { map[a.getAttribute('href').slice(1)] = a; });
+  // 按文档顺序取目标，这样「最后一个滚过顶部的标题」就是要高亮的那个
+  var targets = Array.prototype.slice.call(document.querySelectorAll('h2[id], h3[id]'))
+    .filter(function (el) { return map[el.id]; });
+  var active = null;
+
+  function highlight() {
+    var current = targets.length ? targets[0] : null;
+    for (var i = 0; i < targets.length; i++) {
+      if (targets[i].getBoundingClientRect().top <= 130) current = targets[i];
+      else break;
+    }
+    if (!current || current === active) return;
+    if (active && map[active.id]) map[active.id].classList.remove('active');
+    active = current;
+    if (map[active.id]) map[active.id].classList.add('active');
+  }
+
+  var ticking = false;
+  window.addEventListener('scroll', function () {
+    if (ticking) return;
+    ticking = true;
+    requestAnimationFrame(function () { highlight(); ticking = false; });
+  }, { passive: true });
+  window.addEventListener('resize', highlight, { passive: true });
+  highlight();
+})();
+</script>
 </body>
 </html>
