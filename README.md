@@ -139,7 +139,14 @@ npx wrangler d1 execute fblog-dns-db --remote --file=./migration-proxy.sql
 
 代码里对这个查询做了兜底（列不存在也不会让平台挂掉），但反代功能要等迁移跑完才生效。
 
+用量统计另需一张表（同样有兜底：未执行时不会报错，只是没有统计数据）：
+
+```bash
+npx wrangler d1 execute fblog-dns-db --remote --file=./migration-usage.sql
+```
+
 > 代价：反代请求会消耗**平台自己**的 Workers 额度（免费 10 万请求/天），且平台能看到这些流量。
+> 额度是**全平台共享**的 —— 一个被刷的站点能拖垮所有人，所以务必确认下文的三个防护已生效。
 > 另外反代只放行 `*.workers.dev` 与 `*.pages.dev` 目标，这是刻意的安全边界 ——
 > 不限制的话平台就成了任人使用的公开反向代理。
 
@@ -157,6 +164,9 @@ npx wrangler d1 execute fblog-dns-db --remote --file=./migration-proxy.sql
 ## 六、上线后的安全清单（务必做）
 
 - [ ] 在 Cloudflare **Security → WAF → Rate limiting rules** 加两条免费规则：保护 `/api/login`（如 10 次/分钟/IP）和 `/api/records`（如 30 次/小时/IP）；
+- [ ] **确认反代限流生效**：对某个反代子域名持续请求，超过 1200 次/分钟（每个 Cloudflare 机房）后应开始返回 **429**；
+- [ ] **确认用量统计可用**：面板「管理后台 → 反向代理用量」能看到今天的请求数；同时确认管理员账号绑定了能收信的邮箱，否则额度告警发不出去；
+- [ ] **盯住 Workers 每日请求数**（面板 Workers → Metrics）。跑到 8 成就该处理 —— 跑满会让**所有反代站点一起 522**，不是只影响一家；
 - [ ] 确认 API Token 只授权了 `fblog.cyou` 一个 zone；
 - [ ] `ADMIN_PASSWORD` 与 `SESSION_SECRET` 使用长随机值，勿复用；
 - [ ] 定期检查记录：`npx wrangler d1 execute fblog-dns-db --remote --command "SELECT * FROM records"`，删除僵尸记录；
@@ -167,11 +177,34 @@ npx wrangler d1 execute fblog-dns-db --remote --file=./migration-proxy.sql
 
 | 项目 | 免费额度 |
 | --- | --- |
-| Workers | 10 万请求/天 |
+| Workers | 10 万请求/天（午夜 UTC 重置） |
 | D1 | 500 万行读/天、10 万行写/天、共 5 GB 存储 |
 | Cloudflare DNS | 无限记录、全球 anycast |
 
-你的量级（几十到几百个子域名）完全在免费额度内。
+如果没有开启反代，你的量级（几十到几百个子域名）完全在免费额度内。
+
+### ⚠️ 反代开启后，额度变成全平台共享
+
+反代把**所有**用户子域名的流量都引到平台自己的 Worker 上，吃的是**平台账号**的额度，不是用户自己的：
+
+- 用户站点的**每一次访问 = 平台 1 次 Worker 请求**
+- 10 万/天 ÷ 假设 50 个反代站点 ≈ **每家每天只有 2,000 次**
+- 额度跑满时 Cloudflare 返回错误 **1027**；若该路由是 **fail open**，请求会绕过 Worker 回源到占位地址 `100::`，结果是**所有反代站点一起返回 522**
+- 子请求（转发到用户 Worker 那一步）**不计费**；带宽也完全免费
+
+**内建防护**
+
+| 措施 | 配置项 | 说明 |
+| --- | --- | --- |
+| 限流 | `wrangler.jsonc` 的 `ratelimits`（默认 1200 次/60 秒）与 `RATE_LIMIT_PER_MIN` | 保护额度不被单个站点刷爆。原生 binding 不可用时自动退回内存计数兜底。⚠️ 官方额度粒度是**单个 Cloudflare 机房**，不是全局 —— 全球访问的站点实际允许量约为 limit × 命中机房数。它是滥用防护，不是精确计费控制 |
+| 查询缓存 | `PROXY_CACHE_TTL`（默认 30 秒，设 `0` 关闭） | 省掉每请求一次 D1 往返、降低转发延迟。只缓存「查到了」的结果，新申请的子域名立刻可用；代价是用户改配置后最长 30 秒才生效 |
+| 用量告警 | `USAGE_ALERT_THRESHOLD`（默认 80000）+ `migration-usage.sql` | 当日请求数越过阈值时给所有管理员发一封邮件，每个 UTC 日最多一封 |
+
+**用量是近似值**：计数在 Worker 内存累加、每 200 次请求或每 60 秒汇总落盘一次（把 D1 写放大压到 0.5% 以内），isolate 被回收时未落盘的计数会丢，实际用量通常**略高于**表中数字。作为告警信号足够，但不要当账单用。
+
+管理员可在面板「管理后台 → 反向代理用量」查看近 14 天，或直接调 `GET /api/admin/usage`。
+
+需要扩容时：**Workers Paid 是 $5 USD/月起**（按账号，含 1000 万请求/月，超出 $0.30/百万；CPU 超出 $0.02/百万 ms），**带宽仍然免费**。D1 若升级：行读 250 亿/月含在内（超出 $0.001/百万）、行写 5000 万/月（超出 $1.00/百万）、存储超 5 GB 后 $0.75/GB-月。
 
 ## API 一览
 
@@ -189,6 +222,7 @@ npx wrangler d1 execute fblog-dns-db --remote --file=./migration-proxy.sql
 | POST | `/api/slots/:id/proxy` | 开启/更新反代，`{target:"https://x.y.workers.dev"}` |
 | DELETE | `/api/slots/:id/proxy` | 关闭反代 |
 | POST | `/api/admin/users` | 管理员建号（Bearer ADMIN_PASSWORD） |
+| GET | `/api/admin/usage` | 管理员查看反代用量（近 14 天）与缓存/限流配置 |
 
 ## 目录结构
 
@@ -196,6 +230,7 @@ npx wrangler d1 execute fblog-dns-db --remote --file=./migration-proxy.sql
 fblog-dns/
 ├── wrangler.jsonc        # Worker 配置（D1/Assets 绑定、ROOT_DOMAIN）
 ├── schema.sql            # D1 表结构
+├── migration-*.sql       # 增量迁移（已有库按需执行；全新安装只需 schema.sql）
 ├── public/
 │   └── index.html        # 前端单页（静态资源，经 env.ASSETS 提供）
 ├── src/

@@ -380,6 +380,10 @@
           <h3 style="margin-bottom:10px;font-family:var(--serif)">所有二级域名</h3>
           <div id="admin-slots-box"></div>
         </div>
+        <div class="dash-card" style="margin-bottom:16px">
+          <h3 style="margin-bottom:10px;font-family:var(--serif)">反向代理用量</h3>
+          <div id="admin-usage-box">加载中…</div>
+        </div>
         <div class="dash-card">
           <h3 style="margin-bottom:10px;font-family:var(--serif)">保留域名</h3>
           <div class="form-row">
@@ -718,6 +722,59 @@
     api('/api/admin/users').then(function (d) { renderAdminUsers(d.users); }).catch(function () {});
     api('/api/admin/slots').then(function (d) { renderAdminSlots(d.slots); }).catch(function () {});
     api('/api/admin/reserved').then(function (d) { renderReserved(d.reserved); }).catch(function () {});
+    api('/api/admin/usage').then(function (d) { renderAdminUsage(d); }).catch(function () {});
+  }
+
+  function renderAdminUsage(d) {
+    var box = $('#admin-usage-box'); box.textContent = '';
+    var th = d.threshold || 80000;
+    var todayRow = null;
+    (d.usage || []).forEach(function (r) { if (r.day === d.today) todayRow = r; });
+    var count = (todayRow ? todayRow.requests : 0) + (d.pending || 0);
+    var pct = th ? Math.min(100, Math.round(count / th * 100)) : 0;
+    var color = pct >= 100 ? '#dc2626' : (pct >= 80 ? '#b45309' : '#15803d');
+
+    var head = document.createElement('div');
+    head.style.cssText = 'margin-bottom:10px;color:#5b5147;font-size:14px;line-height:1.9';
+    head.innerHTML = '今日（UTC <b>' + esc(d.today) + '</b>）已处理 <b>' + count + '</b> 次请求 / 告警阈值 ' +
+      th + '，用量 <b style="color:' + color + '">' + pct + '%</b>。' +
+      'Workers 免费额度为 100,000 次/天，跑满会导致<b>所有反代站点一起 522</b>。';
+    box.appendChild(head);
+
+    var bar = document.createElement('div');
+    bar.style.cssText = 'height:8px;border-radius:4px;background:#e7e0d2;overflow:hidden;margin-bottom:12px';
+    var fill = document.createElement('div');
+    fill.style.cssText = 'height:100%;width:' + pct + '%;background:' + color;
+    bar.appendChild(fill);
+    box.appendChild(bar);
+
+    var meta = document.createElement('div');
+    meta.style.cssText = 'color:#7a6f63;font-size:12.5px;margin-bottom:12px;line-height:1.8';
+    meta.textContent = '限流 ' + (d.rate_limit_per_min || 0) + ' 次/分钟/机房 · 查询缓存 ' +
+      ((d.cache && d.cache.ttl_seconds) || 0) + ' 秒（现存 ' + ((d.cache && d.cache.entries) || 0) + ' 条）· ' +
+      '数字为 Worker 内存按批汇总，是近似值，实际用量通常略高';
+    box.appendChild(meta);
+
+    var rows = d.usage || [];
+    if (!rows.length) {
+      var empty = document.createElement('div');
+      empty.style.color = '#7a6f63';
+      empty.textContent = '暂无统计数据（可能尚未执行 migration-usage.sql，或今天还没有反代请求）';
+      box.appendChild(empty);
+      return;
+    }
+    var t = document.createElement('table');
+    t.innerHTML = '<thead><tr><th>日期(UTC)</th><th>请求总数</th><th>成功转发</th><th>被限流</th><th>额度告警</th></tr></thead>';
+    var tb = document.createElement('tbody');
+    rows.forEach(function (r) {
+      var tr = document.createElement('tr');
+      [r.day, r.requests, r.proxied, r.limited, r.alerted ? '已发送' : '—'].forEach(function (v) {
+        var td = document.createElement('td'); td.textContent = String(v); tr.appendChild(td);
+      });
+      tb.appendChild(tr);
+    });
+    t.appendChild(tb);
+    box.appendChild(t);
   }
   function renderAdminUsers(users) {
     var box = $('#admin-users-box'); box.textContent = '';
