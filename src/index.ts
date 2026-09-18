@@ -36,6 +36,14 @@ export interface Env {
    * 逗号分隔。用于避开通配路由抢走本 zone 内其它 Worker 自定义域名的副作用。
    */
   PLATFORM_HOSTS?: string;
+  /**
+   * 「透传」前缀，逗号分隔。命中的子域名不参与反代，而是把原始请求 `fetch()` 出去 ——
+   * 子请求不会被路由拦截，会直达该主机名**自定义域名**背后的那个 Worker。
+   *
+   * 用途：通配路由按官方规则优先级高于自定义域名，会抢走本 zone 内其它 Worker 的
+   * 自定义域名；把它的前缀登记到这里即可原样还给对方。
+   */
+  PASSTHROUGH_HOSTS?: string;
 }
 
 const BASE_SLOTS = 1; // 免费基础卡槽
@@ -831,6 +839,15 @@ function platformLabels(env: Env): Set<string> {
   return extra.length ? new Set([...PLATFORM_LABELS, ...extra]) : PLATFORM_LABELS;
 }
 
+/** 解析 env.PASSTHROUGH_HOSTS */
+function passthroughLabels(env: Env): Set<string> {
+  const list = (env.PASSTHROUGH_HOSTS ?? '')
+    .split(',')
+    .map((s) => s.trim().toLowerCase())
+    .filter(Boolean);
+  return new Set(list);
+}
+
 /** 转发时应剥掉的逐跳首部（RFC 7230 §6.1） */
 const HOP_BY_HOP_HEADERS = [
   'connection',
@@ -1054,6 +1071,16 @@ export default {
       const host = url.hostname.toLowerCase();
       if (rootDomain && host !== rootDomain && host.endsWith('.' + rootDomain)) {
         const label = host.slice(0, host.length - rootDomain.length - 1);
+        // 透传名单：把原始请求 fetch 出去，交还给该主机名「自定义域名」背后的那个
+        // Worker（子请求不会被路由拦截，所以不会再次落回本通配路由）。
+        if (passthroughLabels(env).has(label)) {
+          try {
+            return await fetch(request);
+          } catch (e) {
+            console.error(`透传 ${host} 失败:`, e);
+            return landingPage(env, host, 'idle');
+          }
+        }
         if (!platformLabels(env).has(label)) {
           return await handleProxyDispatch(request, env, label, host);
         }

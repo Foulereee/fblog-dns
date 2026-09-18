@@ -51,7 +51,12 @@
 		// 除 dns / www 之外，还要当成「平台自身入口」（走平台界面、不参与反代）处理的
 		// 子域名前缀，逗号分隔。用途见上方通配路由的副作用说明：本 zone 内其它 Worker 的
 		// 自定义域名会被通配路由抢走，把它的前缀登记到这里即可恢复。
-		"PLATFORM_HOSTS": ""
+		"PLATFORM_HOSTS": "",
+		// 「透传」前缀，逗号分隔：命中的子域名不参与反代，而是把原始请求 fetch 出去，
+		// 直达该主机名自定义域名背后的那个 Worker。
+		// cfnew.fblog.cyou 是另一个 Worker 的自定义域名（origin_worker_id 与 fblog-dns
+		// 不同），被通配路由抢走了，所以这里登记回它。
+		"PASSTHROUGH_HOSTS": "cfnew"
 	},
 	"d1_databases": [
 		{
