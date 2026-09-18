@@ -54,9 +54,11 @@
 		"PLATFORM_HOSTS": "",
 		// 「透传」前缀，逗号分隔：命中的子域名不参与反代，而是把原始请求 fetch 出去，
 		// 直达该主机名自定义域名背后的那个 Worker。
-		// cfnew.fblog.cyou 是另一个 Worker 的自定义域名（origin_worker_id 与 fblog-dns
-		// 不同），被通配路由抢走了，所以这里登记回它。
-		"PASSTHROUGH_HOSTS": "cfnew"
+		//
+		// 目前为空 —— cfnew3 的 cfnew.fblog.cyou 自定义域名已删除，不需要再透传；
+		// 若继续留在名单里，透传出去会因没有自定义域名而回源到占位地址 100::，返回 522。
+		// 以后再给本 zone 内其它 Worker 挂自定义域名时，记得把前缀加到这里。
+		"PASSTHROUGH_HOSTS": ""
 	},
 	"d1_databases": [
 		{
