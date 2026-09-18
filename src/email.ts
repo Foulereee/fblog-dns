@@ -141,3 +141,45 @@ export async function sendExpiryReminder(
   const text = `你的子域名 ${subdomain}.fblog.cyou 将在 ${daysLeft} 天后到期，请登录 https://dns.fblog.cyou 及时续期。`;
   await sendMail(env, { to, subject, html, text });
 }
+
+/**
+ * 反代用量的额度告警（每日最多一封）。
+ *
+ * 背景：反代把全站子域名流量都引到平台自己的 Worker 上，吃平台账号的 Workers
+ * 免费额度（100,000 请求/天）。额度跑满时 Cloudflare 返回 1027；若该路由为
+ * fail open，请求会绕过 Worker 回源到占位地址 100::，结果是所有反代站点一起 522。
+ * 所以要在跑满之前就收到通知。
+ */
+export async function sendUsageAlert(
+  env: EmailEnv,
+  to: string,
+  stats: { day: string; requests: number; proxied: number; limited: number; threshold: number },
+): Promise<void> {
+  const pct = Math.round((stats.requests / stats.threshold) * 100);
+  const subject = `【${PLATFORM_NAME}】反代用量告警：已达阈值 ${pct}%`;
+  const html =
+    `<div style="font-family:system-ui,sans-serif;max-width:520px;margin:0 auto;padding:24px">` +
+    `<h2 style="color:#b45309">反代用量接近免费额度上限</h2>` +
+    `<p style="color:#334155">${esc(stats.day)}（UTC）的反向代理请求数已经达到告警阈值：</p>` +
+    `<table style="border-collapse:collapse;font-size:14px;color:#334155">` +
+    `<tr><td style="padding:4px 12px 4px 0">今日请求数</td><td><b>${stats.requests}</b></td></tr>` +
+    `<tr><td style="padding:4px 12px 4px 0">其中成功转发</td><td>${stats.proxied}</td></tr>` +
+    `<tr><td style="padding:4px 12px 4px 0">其中被限流拦截</td><td>${stats.limited}</td></tr>` +
+    `<tr><td style="padding:4px 12px 4px 0">告警阈值</td><td>${stats.threshold}</td></tr>` +
+    `</table>` +
+    `<p style="color:#334155">Workers 免费额度为 <b>100,000 请求/天</b>（午夜 UTC 重置）。` +
+    `一旦跑满，Cloudflare 会返回错误 1027；若该路由是 fail open，请求将绕过 Worker 回源到占位地址 <code>100::</code>，` +
+    `<b>所有反代站点会一起返回 522</b>。</p>` +
+    `<p style="color:#334155">处理方式：升级到 Workers Paid（$5/月起，含 1000 万请求/月）；` +
+    `或到管理面板排查是哪个子域名在吃额度。</p>` +
+    `<p style="color:#64748b;font-size:13px">此为自动发送的用量告警，每个 UTC 日最多一封。` +
+    `数字来自 Worker 内存按批汇总，是近似值（实际用量通常略高）。</p>` +
+    `</div>`;
+  const text =
+    `${stats.day}（UTC）反代请求数已达告警阈值 ${stats.threshold} 的 ${pct}%。\n` +
+    `今日请求 ${stats.requests}（成功转发 ${stats.proxied}，被限流 ${stats.limited}）。\n` +
+    `Workers 免费额度 100,000 请求/天；跑满后所有反代站点会一起 522。\n` +
+    `处理：升级 Workers Paid（$5/月起），或到 dns.fblog.cyou 管理面板排查。\n` +
+    `（数字为内存批量汇总的近似值，实际通常略高。）`;
+  await sendMail(env, { to, subject, html, text });
+}

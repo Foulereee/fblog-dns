@@ -19,7 +19,7 @@ import {
 } from './auth';
 import { validateSubdomain, validateValue, validateProxyTarget, normalizeProxyTarget } from './validate';
 import { CfDns } from './cloudflare';
-import { EmailBinding, sendCodeEmail, sendExpiryReminder, sendResetCodeEmail } from './email';
+import { EmailBinding, sendCodeEmail, sendExpiryReminder, sendResetCodeEmail, sendUsageAlert } from './email';
 
 export interface Env {
   DB: D1Database;
@@ -44,6 +44,14 @@ export interface Env {
    * 自定义域名；把它的前缀登记到这里即可原样还给对方。
    */
   PASSTHROUGH_HOSTS?: string;
+  /** 反代限流 binding（wrangler.jsonc 的 ratelimits）。缺失时退回内存计数兜底。 */
+  RATE_LIMITER?: RateLimit;
+  /** name → 卡槽 的内存缓存 TTL，单位秒；"0" 关闭。 */
+  PROXY_CACHE_TTL?: string;
+  /** 内存限流兜底用的每分钟上限。 */
+  RATE_LIMIT_PER_MIN?: string;
+  /** 当日反代请求数超过该值时给管理员发告警邮件。 */
+  USAGE_ALERT_THRESHOLD?: string;
 }
 
 const BASE_SLOTS = 1; // 免费基础卡槽
@@ -733,6 +741,35 @@ async function handleAdminReserved(request: Request, env: Env): Promise<Response
   return json({ reserved: rows.results ?? [] });
 }
 
+/**
+ * 反代用量与防护配置（管理员）。
+ *
+ * 用量数字来自 Worker 内存按批汇总写入 proxy_usage，是**近似值** ——
+ * isolate 被回收时未落盘的计数会丢，实际用量通常略高于这里看到的。
+ */
+async function handleAdminUsage(request: Request, env: Env): Promise<Response> {
+  await requireAdmin(request, env);
+  let rows: unknown[] = [];
+  try {
+    const r = await env.DB.prepare(
+      'SELECT day, requests, proxied, limited, alerted, updated_at FROM proxy_usage ORDER BY day DESC LIMIT 14',
+    ).all();
+    rows = r.results ?? [];
+  } catch {
+    /* proxy_usage 表不存在（迁移未执行）：返回空列表而不是 500 */
+  }
+  const today = utcDay();
+  return json({
+    usage: rows,
+    today,
+    // 本 isolate 尚未落盘的内存计数，仅供参考
+    pending: usage.day === today ? usage.requests : 0,
+    threshold: numVar(env.USAGE_ALERT_THRESHOLD, 80000),
+    cache: { ttl_seconds: numVar(env.PROXY_CACHE_TTL, 30), entries: slotCache.size },
+    rate_limit_per_min: numVar(env.RATE_LIMIT_PER_MIN, 1200),
+  });
+}
+
 async function handleAdminAddReserved(request: Request, env: Env): Promise<Response> {
   await requireAdmin(request, env);
   const body = await readJson(request);
@@ -860,6 +897,206 @@ const HOP_BY_HOP_HEADERS = [
   'upgrade',
 ];
 
+// ---------- 反代用的缓存 / 限流 / 用量统计 ----------
+
+function numVar(raw: string | undefined, fallback: number): number {
+  const n = Number(raw);
+  return Number.isFinite(n) && n >= 0 ? n : fallback;
+}
+
+function utcDay(now = Date.now()): string {
+  return new Date(now).toISOString().slice(0, 10);
+}
+
+interface CachedSlot {
+  id: number;
+  proxy_target: string | null;
+  expires_at: number | null;
+  at: number;
+}
+
+/**
+ * name → 卡槽 的内存缓存。
+ * 只缓存「查到了」的结果 —— 没查到不缓存，这样新申请的子域名立刻可用、不会先看到 404。
+ * 代价是用户改配置后最长 PROXY_CACHE_TTL 秒才生效。
+ */
+const slotCache = new Map<string, CachedSlot>();
+const CACHE_MAX_ENTRIES = 5000;
+
+/** 原生 RATE_LIMITER 不可用时的内存限流兜底（按 isolate，偏宽松，仅为防滥用） */
+const memLimit = new Map<string, { n: number; reset: number }>();
+
+/** 用量计数：每个 isolate 各记各的，按批汇总写入 D1，因此是近似值 */
+interface UsageCounter {
+  day: string;
+  requests: number;
+  proxied: number;
+  limited: number;
+  lastFlush: number;
+}
+let usage: UsageCounter = freshUsage();
+
+function freshUsage(): UsageCounter {
+  return { day: utcDay(), requests: 0, proxied: 0, limited: 0, lastFlush: Date.now() };
+}
+
+type SlotLookup = { kind: 'found'; slot: CachedSlot } | { kind: 'missing' } | { kind: 'error' };
+
+/** 查询卡槽，带内存缓存 */
+async function lookupSlot(env: Env, label: string): Promise<SlotLookup> {
+  const ttlMs = numVar(env.PROXY_CACHE_TTL, 30) * 1000;
+  const now = Date.now();
+
+  if (ttlMs > 0) {
+    const hit = slotCache.get(label);
+    if (hit && now - hit.at < ttlMs) return { kind: 'found', slot: hit };
+  }
+
+  try {
+    const row = await env.DB.prepare('SELECT id, proxy_target, expires_at FROM subdomains WHERE name = ?1 LIMIT 1')
+      .bind(label)
+      .first<{ id: number; proxy_target: string | null; expires_at: number | null }>();
+    if (!row) return { kind: 'missing' };
+    const slot: CachedSlot = { id: row.id, proxy_target: row.proxy_target, expires_at: row.expires_at, at: now };
+    if (ttlMs > 0) {
+      if (slotCache.size >= CACHE_MAX_ENTRIES) slotCache.clear();
+      slotCache.set(label, slot);
+    }
+    return { kind: 'found', slot };
+  } catch (e) {
+    console.error('反代查询失败:', e);
+    return { kind: 'error' };
+  }
+}
+
+/** 返回 true 表示放行 */
+async function allowRequest(env: Env, label: string): Promise<boolean> {
+  const limiter = env.RATE_LIMITER;
+  if (limiter) {
+    try {
+      const { success } = await limiter.limit({ key: `proxy:${label}` });
+      return success;
+    } catch (e) {
+      // 限流组件自己出问题时必须放行 —— 不能因为限流把用户站点全打死
+      console.error('原生限流调用失败，本次放行:', e);
+      return true;
+    }
+  }
+  return memoryAllow(env, label);
+}
+
+function memoryAllow(env: Env, label: string): boolean {
+  const limit = numVar(env.RATE_LIMIT_PER_MIN, 1200);
+  if (limit <= 0) return true;
+  const now = Date.now();
+  const entry = memLimit.get(label);
+  if (!entry || now >= entry.reset) {
+    if (memLimit.size >= CACHE_MAX_ENTRIES) memLimit.clear();
+    memLimit.set(label, { n: 1, reset: now + 60_000 });
+    return true;
+  }
+  entry.n += 1;
+  return entry.n <= limit;
+}
+
+const USAGE_FLUSH_EVERY = 200; // 每 200 次请求落盘一次，把 D1 写放大压到 0.5% 以内
+const USAGE_FLUSH_MS = 60_000;
+
+/** 记一次用量；到期就异步汇总写入 D1（不阻塞响应） */
+function bumpUsage(env: Env, ctx: ExecutionContext, hit: { proxied?: boolean; limited?: boolean }): void {
+  const today = utcDay();
+  if (usage.day !== today) usage = freshUsage();
+  usage.requests += 1;
+  if (hit.proxied) usage.proxied += 1;
+  if (hit.limited) usage.limited += 1;
+
+  if (usage.requests < USAGE_FLUSH_EVERY && Date.now() - usage.lastFlush < USAGE_FLUSH_MS) return;
+  const snapshot: UsageCounter = { ...usage };
+  usage = freshUsage();
+  ctx.waitUntil(flushUsage(env, snapshot));
+}
+
+async function flushUsage(env: Env, snap: UsageCounter): Promise<void> {
+  try {
+    await env.DB.prepare(
+      `INSERT INTO proxy_usage (day, requests, proxied, limited, updated_at)
+       VALUES (?1, ?2, ?3, ?4, ?5)
+       ON CONFLICT(day) DO UPDATE SET
+         requests   = requests + excluded.requests,
+         proxied    = proxied  + excluded.proxied,
+         limited    = limited  + excluded.limited,
+         updated_at = excluded.updated_at`,
+    )
+      .bind(snap.day, snap.requests, snap.proxied, snap.limited, new Date().toISOString())
+      .run();
+  } catch (e) {
+    console.error('用量落盘失败（迁移未执行？）:', e);
+    return;
+  }
+  await maybeAlertUsage(env, snap.day);
+}
+
+/**
+ * 当日用量超过阈值就给管理员发告警邮件。
+ * 用「条件更新」原子抢占 alerted 标记，保证同一天即使多个 isolate 同时判断，也只发一封。
+ */
+async function maybeAlertUsage(env: Env, day: string): Promise<void> {
+  const threshold = numVar(env.USAGE_ALERT_THRESHOLD, 80000);
+  if (threshold <= 0) return;
+  try {
+    const row = await env.DB.prepare('SELECT requests, proxied, limited, alerted FROM proxy_usage WHERE day = ?1')
+      .bind(day)
+      .first<{ requests: number; proxied: number; limited: number; alerted: number }>();
+    if (!row || row.alerted || row.requests < threshold) return;
+
+    const claim = await env.DB.prepare('UPDATE proxy_usage SET alerted = 1 WHERE day = ?1 AND alerted = 0')
+      .bind(day)
+      .run();
+    if (!claim.meta || claim.meta.changes <= 0) return; // 别的 isolate 已经发过了
+
+    const admins = await env.DB.prepare(
+      "SELECT email FROM users WHERE role = 'admin' AND email IS NOT NULL AND status = 'active'",
+    ).all<{ email: string }>();
+    for (const a of admins.results ?? []) {
+      await sendUsageAlert(env, a.email, {
+        day,
+        requests: row.requests,
+        proxied: row.proxied,
+        limited: row.limited,
+        threshold,
+      });
+    }
+  } catch (e) {
+    console.error('用量告警处理失败:', e);
+  }
+}
+
+/** 限流命中时返回的页面 */
+function rateLimitedPage(env: Env, host: string): Response {
+  const html =
+    '<!doctype html><html lang="zh-CN"><head><meta charset="utf-8">' +
+    '<meta name="viewport" content="width=device-width,initial-scale=1">' +
+    '<meta name="robots" content="noindex">' +
+    `<title>请求过于频繁 · ${escapeHtml(host)}</title></head>` +
+    '<body style="margin:0;min-height:100vh;display:flex;align-items:center;justify-content:center;' +
+    "font-family:system-ui,-apple-system,'Segoe UI',sans-serif;background:#f6f1e6;color:#1c1712\">" +
+    '<div style="max-width:520px;padding:32px;text-align:center">' +
+    '<h1 style="font-size:20px;margin:0 0 12px">请求过于频繁</h1>' +
+    '<p style="margin:0 0 10px;color:#5b5147;line-height:1.8">该域名短时间内收到太多请求，已被平台限流。</p>' +
+    '<p style="margin:0 0 22px;color:#5b5147;line-height:1.8">请稍后重试。</p>' +
+    `<a href="https://dns.${escapeHtml(env.ROOT_DOMAIN)}/" style="display:inline-block;padding:10px 18px;border-radius:8px;` +
+    'background:#1c1712;color:#f6f1e6;text-decoration:none;font-weight:600">前往 fblog.cyou 免费二级域名平台</a>' +
+    '</div></body></html>';
+  return new Response(html, {
+    status: 429,
+    headers: {
+      'Content-Type': 'text/html; charset=utf-8',
+      'Retry-After': '60',
+      'Cache-Control': 'no-store',
+    },
+  });
+}
+
 /** 无目标 / 已过期 / 未登记时给访客看的落地页 */
 function landingPage(env: Env, host: string, kind: 'unregistered' | 'expired' | 'idle'): Response {
   const title = kind === 'expired' ? '子域名已过期' : kind === 'idle' ? '尚未指向任何内容' : '子域名不存在';
@@ -979,21 +1216,40 @@ async function wildcardRecordMissing(env: Env): Promise<boolean> {
 }
 
 /** 按 Host 分发子域名请求 */
-async function handleProxyDispatch(request: Request, env: Env, label: string, host: string): Promise<Response> {
-  let slot: { id: number; proxy_target: string | null; expires_at: number | null } | null = null;
-  try {
-    slot = await env.DB.prepare('SELECT id, proxy_target, expires_at FROM subdomains WHERE name = ?1 LIMIT 1')
-      .bind(label)
-      .first<{ id: number; proxy_target: string | null; expires_at: number | null }>();
-  } catch (e) {
-    console.error('反代查询失败:', e);
+async function handleProxyDispatch(
+  request: Request,
+  env: Env,
+  label: string,
+  host: string,
+  ctx: ExecutionContext,
+): Promise<Response> {
+  // 先限流：这是唯一能被外部恶意触发、进而拖垮所有用户站点（共用平台免费额度）的风险
+  if (!(await allowRequest(env, label))) {
+    bumpUsage(env, ctx, { limited: true });
+    return rateLimitedPage(env, host);
+  }
+
+  const lookup = await lookupSlot(env, label);
+  if (lookup.kind === 'error') {
+    bumpUsage(env, ctx, {});
+    return landingPage(env, host, 'idle');
+  }
+  if (lookup.kind === 'missing') {
+    bumpUsage(env, ctx, {});
+    return landingPage(env, host, 'unregistered');
+  }
+
+  const slot = lookup.slot;
+  if ((slot.expires_at ?? 0) <= Date.now()) {
+    bumpUsage(env, ctx, {});
+    return landingPage(env, host, 'expired');
+  }
+  if (!slot.proxy_target) {
+    bumpUsage(env, ctx, {});
     return landingPage(env, host, 'idle');
   }
 
-  if (!slot) return landingPage(env, host, 'unregistered');
-  if ((slot.expires_at ?? 0) <= Date.now()) return landingPage(env, host, 'expired');
-  if (!slot.proxy_target) return landingPage(env, host, 'idle');
-
+  bumpUsage(env, ctx, { proxied: true });
   return await proxyTo(slot.proxy_target, request, host);
 }
 
@@ -1060,7 +1316,7 @@ async function handleDeleteProxy(request: Request, env: Env, path: string): Prom
 
 // ---------- 入口 ----------
 export default {
-  async fetch(request: Request, env: Env): Promise<Response> {
+  async fetch(request: Request, env: Env, ctx: ExecutionContext): Promise<Response> {
     try {
       const url = new URL(request.url);
       const path = url.pathname;
@@ -1082,7 +1338,7 @@ export default {
           }
         }
         if (!platformLabels(env).has(label)) {
-          return await handleProxyDispatch(request, env, label, host);
+          return await handleProxyDispatch(request, env, label, host, ctx);
         }
       }
 
@@ -1140,6 +1396,9 @@ export default {
         case '/api/admin/reserved':
           if (request.method === 'GET') return await handleAdminReserved(request, env);
           if (request.method === 'POST') return await handleAdminAddReserved(request, env);
+          break;
+        case '/api/admin/usage':
+          if (request.method === 'GET') return await handleAdminUsage(request, env);
           break;
       }
 

@@ -70,6 +70,16 @@ CREATE TABLE IF NOT EXISTS reserved_subdomains (
   created_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ', 'now'))
 );
 
+-- 反代用量统计（按 UTC 天聚合，用于免费额度告警；Worker 内存按批汇总写入，近似值）
+CREATE TABLE IF NOT EXISTS proxy_usage (
+  day TEXT PRIMARY KEY,
+  requests INTEGER NOT NULL DEFAULT 0,
+  proxied INTEGER NOT NULL DEFAULT 0,
+  limited INTEGER NOT NULL DEFAULT 0,
+  alerted INTEGER NOT NULL DEFAULT 0,
+  updated_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ', 'now'))
+);
+
 CREATE INDEX IF NOT EXISTS idx_users_email ON users(email);
 CREATE INDEX IF NOT EXISTS idx_subdomains_user ON subdomains(user_id);
 CREATE INDEX IF NOT EXISTS idx_subdomains_expires ON subdomains(expires_at);
