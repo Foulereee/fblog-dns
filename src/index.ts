@@ -31,6 +31,11 @@ export interface Env {
   ADMIN_PASSWORD: string;
   SESSION_SECRET: string;
   ROOT_DOMAIN: string;
+  /**
+   * 除 dns / www 外，还要当成「平台自身入口」（走平台界面、不参与反代）的子域名前缀，
+   * 逗号分隔。用于避开通配路由抢走本 zone 内其它 Worker 自定义域名的副作用。
+   */
+  PLATFORM_HOSTS?: string;
 }
 
 const BASE_SLOTS = 1; // 免费基础卡槽
@@ -810,6 +815,22 @@ async function scheduled(_event: ScheduledController, env: Env, _ctx: ExecutionC
 /** 平台自身占用的子域名前缀：这些 Host 走平台界面，绝不参与反代 */
 const PLATFORM_LABELS = new Set(['dns', 'www']);
 
+/**
+ * 平台入口前缀 = 内置的 dns/www + env.PLATFORM_HOSTS。
+ *
+ * 为什么需要这个开关：官方文档明确「Routes can fetch() Custom Domains and take
+ * precedence if configured on the same hostname」—— 通配路由 `*.fblog.cyou/*`
+ * 会抢走本 zone 内**其它 Worker 的自定义域名**（只有更精确的路由才能赢过通配）。
+ * 把这类前缀登记到 PLATFORM_HOSTS，它们就会走平台界面而不是被当成用户卡槽。
+ */
+function platformLabels(env: Env): Set<string> {
+  const extra = (env.PLATFORM_HOSTS ?? '')
+    .split(',')
+    .map((s) => s.trim().toLowerCase())
+    .filter(Boolean);
+  return extra.length ? new Set([...PLATFORM_LABELS, ...extra]) : PLATFORM_LABELS;
+}
+
 /** 转发时应剥掉的逐跳首部（RFC 7230 §6.1） */
 const HOP_BY_HOP_HEADERS = [
   'connection',
@@ -1033,7 +1054,7 @@ export default {
       const host = url.hostname.toLowerCase();
       if (rootDomain && host !== rootDomain && host.endsWith('.' + rootDomain)) {
         const label = host.slice(0, host.length - rootDomain.length - 1);
-        if (!PLATFORM_LABELS.has(label)) {
+        if (!platformLabels(env).has(label)) {
           return await handleProxyDispatch(request, env, label, host);
         }
       }

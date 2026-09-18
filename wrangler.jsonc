@@ -20,13 +20,16 @@
 		// 通配路由：所有 *.fblog.cyou 的请求都交给本 Worker，由 Worker 按 Host 分发 ——
 		// 若该子域名登记了反代目标，就转发到用户自己的 Workers/Pages；否则返回一张落地页。
 		//
-		// ⚠️ 上线前必须再补一条「泛解析」DNS 记录，否则子域名根本解析不到 CF 边缘，
-		//    通配路由永远不会触发：
+		// ⚠️ 前置条件：必须有一条「泛解析」DNS 记录，否则子域名解析不到 CF 边缘，
+		//    通配路由永远不会触发（官方文档：Domains and subdomains must have a DNS
+		//    Record to be proxied on Cloudflare and used to invoke a Worker）：
 		//      AAAA  *.fblog.cyou   100::    代理状态：已代理（橙云）
 		//    已有「仅 DNS（灰云）」记录的子域名优先级更高，照旧直连用户自己的服务器。
 		//
-		// 自定义域名 / 更精确的路由优先级高于通配路由，
-		// 所以 dns.fblog.cyou、cfnew.fblog.cyou 等不会被这里抢走。
+		// ⚠️ 已知副作用（官方文档原文）："Routes can fetch() Custom Domains and take
+		//    precedence if configured on the same hostname." —— 路由优先级高于自定义域名，
+		//    所以本 zone 里「别的 Worker 的自定义域名」会被这条通配路由抢走（只有更精确的
+		//    路由才能赢过它）。把这类主机名前缀登记到 vars.PLATFORM_HOSTS 即可避开。
 		{
 			"pattern": "*.fblog.cyou/*",
 			"zone_name": "fblog.cyou"
@@ -44,7 +47,11 @@
 		"crons": ["0 3 * * *"]
 	},
 	"vars": {
-		"ROOT_DOMAIN": "fblog.cyou"
+		"ROOT_DOMAIN": "fblog.cyou",
+		// 除 dns / www 之外，还要当成「平台自身入口」（走平台界面、不参与反代）处理的
+		// 子域名前缀，逗号分隔。用途见上方通配路由的副作用说明：本 zone 内其它 Worker 的
+		// 自定义域名会被通配路由抢走，把它的前缀登记到这里即可恢复。
+		"PLATFORM_HOSTS": ""
 	},
 	"d1_databases": [
 		{
