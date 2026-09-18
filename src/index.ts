@@ -767,6 +767,8 @@ async function handleAdminUsage(request: Request, env: Env): Promise<Response> {
     threshold: numVar(env.USAGE_ALERT_THRESHOLD, 80000),
     cache: { ttl_seconds: numVar(env.PROXY_CACHE_TTL, 30), entries: slotCache.size },
     rate_limit_per_min: numVar(env.RATE_LIMIT_PER_MIN, 1200),
+    // 诊断用：原生限流 binding 是否真的挂上了。为 false 时说明只靠内存兜底（按 isolate，偏宽松）
+    rate_limiter_bound: Boolean(env.RATE_LIMITER),
   });
 }
 
@@ -977,9 +979,8 @@ async function allowRequest(env: Env, label: string): Promise<boolean> {
       const { success } = await limiter.limit({ key: `proxy:${label}` });
       return success;
     } catch (e) {
-      // 限流组件自己出问题时必须放行 —— 不能因为限流把用户站点全打死
-      console.error('原生限流调用失败，本次放行:', e);
-      return true;
+      // 原生限流组件出问题时退回内存兜底 —— 直接放行等于限流被静默关掉
+      console.error('原生限流调用失败，退回内存限流:', e);
     }
   }
   return memoryAllow(env, label);
