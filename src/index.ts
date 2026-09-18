@@ -498,7 +498,8 @@ async function handleSetRecord(request: Request, env: Env, path: string): Promis
 
   const body = await readJson(request);
   const type = String(body?.type ?? '').toUpperCase();
-  const value = String(body?.value ?? '').trim();
+  let value = String(body?.value ?? '').trim();
+  if (type === 'CNAME') value = value.replace(/\.+$/, '').toLowerCase(); // 规范化：去尾点 + 小写
   if (type !== 'A' && type !== 'AAAA' && type !== 'CNAME') return json({ error: '记录类型仅支持 A / AAAA / CNAME' }, 400);
   const verr = validateValue(type, value, env.ROOT_DOMAIN);
   if (verr) return json({ error: verr }, 400);

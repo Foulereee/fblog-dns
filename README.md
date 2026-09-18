@@ -93,6 +93,16 @@ curl -X POST https://fblog-dns.<你的子域>.workers.dev/api/admin/users \
 2. 等 Cloudflare 自动创建 CNAME 并签发证书，访问 `https://dns.fblog.cyou` 即面板。
 3. 用上面的 curl 把地址换成 `https://dns.fblog.cyou/api/admin/users`。
 
+## 用户自助部署到 Workers/Pages（可选）
+
+平台支持用户把 `xxx.fblog.cyou` 绑定为 Cloudflare Workers（函数）/ Pages（页面）的**自定义域名**（跨账号 CNAME setup，免费）：
+
+1. 用户在**自己的** Cloudflare 账号创建 Workers / Pages 项目；
+2. 项目 → **Custom domains / 自定义域名** → 添加 `xxx.fblog.cyou`，拿到 Cloudflare 给的 **CNAME 目标**（形如 `xxx.fblog.cyou.cdn.cloudflare.net`）；
+3. 用户回到本平台「我的子域名」，把目标填进该子域名的 **CNAME** 记录值，保存即可，Cloudflare 会自动签发 HTTPS 证书。
+
+> 平台侧记录统一为「仅 DNS（灰云）」；CNAME 目标已兼容 Cloudflare 的尾点写法。面向用户的图文说明见 `/how`。
+
 ## 六、上线后的安全清单（务必做）
 
 - [ ] 在 Cloudflare **Security → WAF → Rate limiting rules** 加两条免费规则：保护 `/api/login`（如 10 次/分钟/IP）和 `/api/records`（如 30 次/小时/IP）；

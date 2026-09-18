@@ -331,6 +331,18 @@
 
       <div class="dash-panel" id="panel-slots">
         <div class="dash-head"><h1>我的子域名</h1></div>
+        <details class="dash-card" style="margin-bottom:16px;cursor:pointer">
+          <summary style="font-weight:600;color:var(--ink)">🚀 用子域名部署 Cloudflare Workers / Pages（函数 / 页面）</summary>
+          <div style="margin-top:12px;color:var(--ink-soft);font-size:13px;line-height:1.9">
+            <p>想让 <code>xxx.fblog.cyou</code> 直接跑你自己的函数或静态页面？按下面三步：</p>
+            <ol style="padding-left:18px;margin:8px 0;display:grid;gap:6px">
+              <li>在<b>你自己的</b> Cloudflare 账号里创建 Workers（函数）或 Pages（页面）项目；</li>
+              <li>在项目里进入 <b>自定义域名 / Custom domains</b> → 添加 <code>xxx.fblog.cyou</code>，Cloudflare 会给你一个 <b>CNAME 目标</b>（形如 <code>xxx.fblog.cyou.cdn.cloudflare.net</code>）；</li>
+              <li>回到这里，把该目标填进下方该子域名的 <b>CNAME</b> 记录值即可，Cloudflare 会自动为它签发 HTTPS 证书。</li>
+            </ol>
+            <span class="small muted">这是 Cloudflare 的跨账号自定义域名（CNAME setup），免费、无需迁移 fblog.cyou 的 NS。</span>
+          </div>
+        </details>
         <div id="slots-box"></div>
       </div>
 
@@ -602,7 +614,19 @@
       var rf = document.createElement('div'); rf.className = 'rec-form';
       var sel = document.createElement('select');
       ['A', 'AAAA', 'CNAME'].forEach(function (t) { var o = document.createElement('option'); o.value = t; o.textContent = t; if (s.record && s.record.type === t) o.selected = true; sel.appendChild(o); });
-      var vin = document.createElement('input'); vin.placeholder = '例如 1.2.3.4 或 example.com'; vin.value = s.record ? s.record.value : '';
+      var PLACEHOLDERS = { A: '例如 1.2.3.4（IPv4）', AAAA: '例如 2001:db8::1（IPv6）', CNAME: '例如 xxx.fblog.cyou.cdn.cloudflare.net（CF 给的 CNAME 目标）' };
+      var vin = document.createElement('input'); vin.placeholder = PLACEHOLDERS[sel.value]; vin.value = s.record ? s.record.value : '';
+      var hint = document.createElement('div'); hint.style.cssText = 'flex-basis:100%;font-size:12px;color:var(--ink-soft);line-height:1.6';
+      function refreshRecHint() {
+        vin.placeholder = PLACEHOLDERS[sel.value] || '';
+        if (sel.value === 'CNAME') {
+          hint.innerHTML = '💡 部署 Workers/Pages：在自己 Cloudflare 账号给项目添加自定义域名 <code style="font-size:11px">' + s.name + '.' + state.rootDomain + '</code>，拿到 Cloudflare 给的 CNAME 目标后填到这里，即可自动签发 HTTPS 证书。';
+        } else {
+          hint.textContent = '';
+        }
+      }
+      sel.addEventListener('change', refreshRecHint);
+      refreshRecHint();
       var setBtn = document.createElement('button'); setBtn.className = 'btn btn-sm btn-primary'; setBtn.type = 'button'; setBtn.textContent = s.record ? '更新记录' : '设置记录';
       setBtn.addEventListener('click', function () {
         setBtn.disabled = true;
@@ -615,7 +639,7 @@
         if (!window.confirm('确定释放 ' + s.name + '.' + state.rootDomain + ' 吗？')) return;
         api('/api/slots/' + s.id, { method: 'DELETE' }).then(function () { toast('已释放', 'ok'); loadDash(); }).catch(function (e) { toast(e.message, 'err'); });
       });
-      rf.appendChild(sel); rf.appendChild(vin); rf.appendChild(setBtn); rf.appendChild(delBtn);
+      rf.appendChild(sel); rf.appendChild(vin); rf.appendChild(setBtn); rf.appendChild(delBtn); rf.appendChild(hint);
 
       if (s.renewable && !s.expired) {
         var renew = document.createElement('button'); renew.className = 'btn btn-sm'; renew.type = 'button'; renew.textContent = '续期 1 年';

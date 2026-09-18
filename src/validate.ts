@@ -52,13 +52,17 @@ export function validateValue(type: string, value: string, rootDomain: string): 
   }
 
   if (type === 'CNAME') {
-    if (/^https?:\/\//i.test(v)) return 'CNAME 目标不需要 http(s):// 前缀';
-    if (/^[\d.]+$/.test(v) || v.includes(':')) return 'CNAME 目标需要是一个域名，不能是 IP 地址';
-    if (!/^[a-zA-Z0-9]([a-zA-Z0-9.-]*[a-zA-Z0-9])?$/.test(v) || v.length > 253) {
+    // 去掉末尾点（FQDN 写法）并小写。Cloudflare 跨账号自定义域名（CNAME setup）
+    // 给出的目标形如 `xxx.fblog.cyou.cdn.cloudflare.net.`，常带尾点，需兼容。
+    const c = v.replace(/\.+$/, '').toLowerCase();
+    if (!c) return 'CNAME 目标不能为空';
+    if (/^https?:\/\//i.test(c)) return 'CNAME 目标不需要 http(s):// 前缀';
+    if (/^[\d.]+$/.test(c) || c.includes(':')) return 'CNAME 目标需要是一个域名，不能是 IP 地址';
+    if (!/^[a-zA-Z0-9]([a-zA-Z0-9.-]*[a-zA-Z0-9])?$/.test(c) || c.length > 253) {
       return 'CNAME 目标域名不合法';
     }
-    const lower = v.toLowerCase();
-    if (lower === rootDomain || lower.endsWith('.' + rootDomain)) {
+    const rd = rootDomain.toLowerCase();
+    if (c === rd || c.endsWith('.' + rd)) {
       return '不允许 CNAME 指向本域名自身，防止解析循环';
     }
     return null;

@@ -61,6 +61,15 @@
     <li><code>CNAME</code>：指向另一个域名，例如 <code>example.com</code>。</li>
   </ul>
 
+  <h2>部署 Cloudflare Workers / Pages（函数 / 页面）</h2>
+  <p>想把 <code>xxx.fblog.cyou</code> 直接挂到你自己的 Cloudflare Workers（函数）或 Pages（静态页面）上？这是 Cloudflare 的跨账号自定义域名（CNAME setup），免费、无需迁移 fblog.cyou 的 NS：</p>
+  <ol>
+    <li>在<b>你自己的</b> Cloudflare 账号创建 Workers 或 Pages 项目；</li>
+    <li>在项目里进入 <b>自定义域名 / Custom domains</b>，添加 <code>xxx.fblog.cyou</code>，Cloudflare 会给你一个 <b>CNAME 目标</b>（形如 <code>xxx.fblog.cyou.cdn.cloudflare.net</code>）；</li>
+    <li>回到本平台「我的子域名」，把该目标填进对应子域名的 <b>CNAME</b> 记录值，保存后 Cloudflare 会自动签发 HTTPS 证书，稍等片刻即可用 <code>https://xxx.fblog.cyou</code> 访问。</li>
+  </ol>
+  <div class="tip">普通 CNAME 只是把域名指到目标；只有走上面的「自定义域名」流程，Cloudflare 才会为 <code>xxx.fblog.cyou</code> 签发专属证书并接管访问。</div>
+
   <h2>DDNS 动态解析（家庭宽带）</h2>
   <p>家庭宽带公网 IP 经常变化时，用 DDNS 自动更新。在「DDNS 管理」复制你的更新地址，配合路由器或脚本使用：</p>
   <ul>
