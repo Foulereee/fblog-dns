@@ -10,7 +10,7 @@
 <style>
   :root {
     --paper: #f6f1e6; --paper2: #eee6d5; --card: #fffdf7;
-    --ink: #1c1712; --ink-soft: #5c5343; --line: #e2d8c3;
+    --ink: #1c1712; --ink-soft: #5c5343; --ink-mid: #3d3527; --line: #e2d8c3;
     --accent: #c2410c; --accent-2: #b45309; --ok: #15803d; --warn: #b45309; --danger: #b91c1c;
     --radius: 14px;
     --serif: Georgia, "Times New Roman", "Songti SC", "Noto Serif SC", serif;
@@ -66,8 +66,14 @@
   .card h3 { font-family: var(--serif); font-size:18px; margin-bottom:8px; font-weight:700; }
   .card p { color: var(--ink-soft); font-size:13.5px; }
   footer { border-top:1px solid var(--line); padding:26px 0 36px; text-align:center; color: var(--ink-soft); font-size:13px; }
-  footer a { color: var(--accent); text-decoration:none; }
-  footer a:hover { text-decoration:underline; }
+  /* 页脚链接：用同色系的深棕（介于正文色与标题色之间）+ 一条淡下划线表示可点击，
+     不再用 --accent 那个亮橙色 —— 页脚不需要那么抢眼。 */
+  footer a { color: var(--ink-mid); text-decoration:underline; text-decoration-color: rgba(92,83,67,.4); text-underline-offset:3px; transition:color .15s, text-decoration-color .15s; }
+  footer a:hover { color: var(--ink); text-decoration-color: var(--ink); }
+  /* 居中且可换行：窄屏时整段折成两行，而不是硬挤成一行溢出 */
+  .foot-line { display:flex; flex-wrap:wrap; align-items:center; justify-content:center; gap:6px 10px; }
+  .foot-line > span:first-child { white-space:nowrap; }
+  .foot-sep { color: var(--ink-soft); opacity:.55; }
   .panel { max-width:460px; margin:40px auto; }
   .panel .title { font-family: var(--serif); font-size:26px; font-weight:700; text-align:center; margin-bottom:6px; }
   .panel .subtitle { text-align:center; color: var(--ink-soft); font-size:13.5px; margin-bottom:22px; }
@@ -212,11 +218,18 @@
       <div class="card"><h3>② 申请占用</h3><p>输入前缀并检测可用性，点击申请即可占用这个二级域名。</p></div>
       <div class="card"><h3>③ 设置记录</h3><p>在「我的子域名」里为它设置 A/AAAA/CNAME 记录，即可使用。</p></div>
     </div>
-    <p style="text-align:center;margin-top:22px"><a class="link" href="/how">查看详细使用教程 →</a></p>
   </section>
 
   <footer class="wrap">
-    本站已运营 <span id="foot-days">—</span> 天 · <a href="https://esa.fblog.cloud" target="_blank" rel="noopener">访问站长博客 esa.fblog.cloud</a> · <a href="/rules">使用规则</a> · <a href="/terms">用户协议与免责声明</a>
+    <div class="foot-line">
+      <span>本站已运营 <span id="foot-days">—</span> 天</span>
+      <span class="foot-sep">·</span>
+      <a href="https://esa.fblog.cloud" target="_blank" rel="noopener">访问站长博客</a>
+      <span class="foot-sep">·</span>
+      <a href="/rules">使用规则</a>
+      <span class="foot-sep">·</span>
+      <a href="/terms">用户协议与免责声明</a>
+    </div>
   </footer>
 </div>
 
