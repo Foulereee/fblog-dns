@@ -51,7 +51,7 @@
     <li>输入想要的前缀（如 <code>myblog</code>），系统会实时检测是否可用；</li>
     <li>点击「申请占用」，即可占有 <code>myblog.fblog.cyou</code>。</li>
   </ol>
-  <div class="tip">申请仅占用前缀，此时还不设置记录。每个账号默认 1 个卡槽，第 2 个需 GitHub 星标（即将开放），第 3-5 个联系管理员开启。</div>
+  <div class="tip">申请仅占用前缀，此时还不设置记录。每个账号默认 2 个卡槽，完成 GitHub 星标可再解锁 3 个（合计 5 个）；需要更多请联系管理员。</div>
 
   <h2>第三步：设置 DNS 记录</h2>
   <p>在「我的子域名」中找到刚申请的域名，选择记录类型并填写目标地址：</p>
@@ -68,7 +68,7 @@
     <li>回到本平台「我的子域名」，在对应卡槽点 <b>开启反代</b>，把该地址填进去并保存；</li>
     <li>访问 <code>https://xxx.fblog.cyou</code> 就会转发到你的部署，之后你在自己账号里改代码、重新部署即可，平台无需任何改动。</li>
   </ol>
-  <div class="tip">反代只支持 <code>*.workers.dev</code> 和 <code>*.pages.dev</code> 目标。它与上面的 DNS 记录<b>互斥</b>——同一个子域名要么填 DNS 记录，要么开反代，二选一。</div>
+  <div class="tip">反代只支持这几类目标：<code>*.workers.dev</code>、<code>*.pages.dev</code>（Cloudflare）、<code>*.fcapp.run</code>（阿里云函数计算）、<code>*.tencentscf.com</code>（腾讯云云函数）。<b>不支持任意网址</b>，比如填 <code>https://baidu.com</code> 会被拒绝 —— 否则平台就成了任人使用的公开反向代理。它与上面的 DNS 记录<b>互斥</b>——同一个子域名要么填 DNS 记录，要么开反代，二选一。</div>
 
   <h2>关于「把子域名加进自己的 Cloudflare」</h2>
   <p>你可能会想在自己账号里把 <code>xxx.fblog.cyou</code> 添加为一个站点，从而获得完整的 Cloudflare 能力。<b>这条路目前走不通</b>，不是平台限制，而是 Cloudflare 的产品规则：</p>

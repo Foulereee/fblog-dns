@@ -318,14 +318,14 @@
     </aside>
     <main class="dash-content">
       <div class="dash-panel active" id="panel-claim">
-        <div class="dash-head"><h1>申请子域名</h1><div class="quota-bar"><span>卡槽</span><div class="quota-track"><div class="quota-fill" id="quota-fill" style="width:0%"></div></div><span id="quota-text">0 / 1</span></div></div>
+        <div class="dash-head"><h1>申请子域名</h1><div class="quota-bar"><span>卡槽</span><div class="quota-track"><div class="quota-fill" id="quota-fill" style="width:0%"></div></div><span id="quota-text">0 / 2</span></div></div>
         <div class="dash-card">
           <label>前缀</label>
           <input id="claim-sub" placeholder="例如 myapp" maxlength="63" required>
           <div class="avail" id="claim-avail"></div>
           <div id="claim-msg" class="msg"></div>
           <button class="btn btn-primary" type="button" id="claim-btn">申请占用</button>
-          <p class="small muted" style="margin-top:12px">申请仅占用前缀，之后在「我的子域名」里设置 A/AAAA/CNAME 记录。第 2 个卡槽需 GitHub 星标（即将开放），第 3-5 个卡槽联系管理员开启。</p>
+          <p class="small muted" style="margin-top:12px" id="claim-tip">申请仅占用前缀，之后在「我的子域名」里设置 A/AAAA/CNAME 记录，或为卡槽开启反向代理。</p>
         </div>
       </div>
 
@@ -412,7 +412,7 @@
   'use strict';
   var $ = function (sel) { return document.querySelector(sel); };
   var LAUNCH = Date.UTC(2026, 8, 14);
-  var state = { user: null, userEmail: null, role: 'user', slots: [], rootDomain: 'fblog.cyou', maxSlots: 1, checkTimer: null, checkSeq: 0 };
+  var state = { user: null, userEmail: null, role: 'user', slots: [], rootDomain: 'fblog.cyou', maxSlots: 2, publicSlotCap: 5, starBonusSlots: 3, githubStar: 0, checkTimer: null, checkSeq: 0 };
 
   function api(path, opts) {
     opts = opts || {};
@@ -549,8 +549,12 @@
     api('/api/me').then(function (m) {
       state.user = m.username; state.userEmail = m.email; state.role = m.role;
       state.rootDomain = m.rootDomain; state.maxSlots = m.maxSlots;
+      state.publicSlotCap = m.publicSlotCap || 5;
+      state.starBonusSlots = m.starBonusSlots || 3;
+      state.githubStar = m.githubStar || 0;
       $('#quota-fill').style.width = Math.min(100, (m.usedSlots || 0) / m.maxSlots * 100) + '%';
       $('#quota-text').textContent = (m.usedSlots || 0) + ' / ' + m.maxSlots;
+      renderClaimTip(m);
       $('#side-user').textContent = m.username + (m.email ? ' · ' + m.email : '');
       $('#side-admin').style.display = (m.role === 'admin') ? '' : 'none';
       renderAccount(m);
@@ -560,6 +564,24 @@
       state.slots = d.slots || [];
       renderSlots(); renderDDNS();
     }).catch(function () {});
+  }
+
+  /**
+   * 「申请子域名」页底部的动态提示：按当前是否已星标、是否用满卡槽给出下一步。
+   * 注意：对外只出现 maxSlots（正常用户是 5），管理员授予的后台上限 20 不在此展示。
+   */
+  function renderClaimTip(m) {
+    var tip = $('#claim-tip');
+    if (!tip) return;
+    var used = m.usedSlots || 0, max = m.maxSlots || 0;
+    var bonus = m.starBonusSlots || 3;
+    if (used < max) {
+      tip.textContent = '申请仅占用前缀，之后在「我的子域名」里设置 A/AAAA/CNAME 记录，或为卡槽开启反向代理。';
+    } else if (!m.githubStar) {
+      tip.textContent = '你已用满 ' + max + ' 个免费卡槽。给项目点一个 GitHub Star，即可再解锁 ' + bonus + ' 个卡槽。';
+    } else {
+      tip.textContent = '你已解锁全部 ' + max + ' 个卡槽。想解锁更多？请联系管理员。';
+    }
   }
 
   function renderAccount(m) {
@@ -613,10 +635,34 @@
       pill.className = 'pill ' + (s.expired ? 'danger' : used ? 'ok' : 'gray');
       pill.textContent = s.expired ? '已过期' : s.record ? '已使用 · ' + s.record.type : s.proxy_target ? '反代中' : '未使用';
       head.appendChild(name); head.appendChild(pill);
+      if (s.note) {
+        var noteTag = document.createElement('span');
+        noteTag.style.cssText = 'font-size:12.5px;color:var(--ink-soft)';
+        noteTag.textContent = '「' + s.note + '」';
+        head.appendChild(noteTag);
+      }
       var meta = document.createElement('div'); meta.className = 'slot-meta';
       meta.textContent = '到期 ' + fmtDate(s.expires_at) + '（剩 ' + s.days_remaining + ' 天）'
         + (s.record ? ' · 值 ' + s.record.value : s.proxy_target ? ' · 反代 → ' + s.proxy_target : '');
       card.appendChild(head); card.appendChild(meta);
+
+      // ---- 备注（名字）：纯自己整理用，不影响解析，也不要求唯一 ----
+      var nf = document.createElement('div'); nf.className = 'rec-form';
+      var nin = document.createElement('input');
+      nin.placeholder = '备注 / 名字（可选，最多 20 字，例如「我的博客」）';
+      nin.maxLength = 20;
+      nin.value = s.note || '';
+      var nBtn = document.createElement('button');
+      nBtn.className = 'btn btn-sm'; nBtn.type = 'button';
+      nBtn.textContent = s.note ? '改备注' : '加备注';
+      nBtn.addEventListener('click', function () {
+        nBtn.disabled = true;
+        api('/api/slots/' + s.id + '/note', { method: 'POST', body: { note: nin.value } })
+          .then(function () { toast('备注已保存', 'ok'); loadDash(); })
+          .catch(function (e) { toast(e.message, 'err'); nBtn.disabled = false; });
+      });
+      nf.appendChild(nin); nf.appendChild(nBtn);
+      card.appendChild(nf);
 
       var rf = document.createElement('div'); rf.className = 'rec-form';
       var sel = document.createElement('select');
@@ -665,7 +711,7 @@
       pHint.style.cssText = 'flex-basis:100%;font-size:12px;color:var(--ink-soft);line-height:1.6';
       pHint.innerHTML = s.proxy_target
         ? '✅ 已反代到 <code style="font-size:11px">' + esc(s.proxy_target) + '</code>：访问 <code style="font-size:11px">' + esc(fqdn) + '</code> 会转发到这里。'
-        : '💡 把 <code style="font-size:11px">' + esc(fqdn) + '</code> 指向你自己账号里部署的 Cloudflare Workers / Pages（<code style="font-size:11px">*.workers.dev</code> 或 <code style="font-size:11px">*.pages.dev</code>）。代码和部署都在你自己账号，平台只做一层转发。与上面那条 DNS 记录<b>互斥</b>，二选一。';
+        : '💡 把 <code style="font-size:11px">' + esc(fqdn) + '</code> 指向你自己部署的 Serverless 应用 —— 支持 Cloudflare Workers / Pages（<code style="font-size:11px">*.workers.dev</code>、<code style="font-size:11px">*.pages.dev</code>）、阿里云函数计算（<code style="font-size:11px">*.fcapp.run</code>）、腾讯云云函数（<code style="font-size:11px">*.tencentscf.com</code>）。代码和部署都在你自己账号，平台只做一层转发。与上面那条 DNS 记录<b>互斥</b>，二选一。';
       var pSetBtn = document.createElement('button');
       pSetBtn.className = 'btn btn-sm btn-primary'; pSetBtn.type = 'button';
       pSetBtn.textContent = s.proxy_target ? '更新反代' : '开启反代';
@@ -690,6 +736,18 @@
 
       box.appendChild(card);
     });
+
+    // 卡槽列表最下面：用满之后的下一步提示。
+    // 对外只出现 maxSlots（普通用户是 5），管理员授予的后台上限（20）不在此展示。
+    if (state.maxSlots > 0 && state.slots.length >= state.maxSlots) {
+      var foot = document.createElement('div');
+      foot.className = 'slot-card';
+      foot.style.cssText = 'text-align:center;color:var(--ink-soft);font-size:13px;line-height:1.9';
+      foot.textContent = state.githubStar
+        ? '你已解锁全部 ' + state.maxSlots + ' 个卡槽。想解锁更多？请联系管理员。'
+        : '你已用满 ' + state.maxSlots + ' 个卡槽。给项目点一个 GitHub Star，即可再解锁 ' + state.starBonusSlots + ' 个卡槽。';
+      box.appendChild(foot);
+    }
   }
 
   function copyText(text, okMsg) {
@@ -787,16 +845,16 @@
       var td2 = document.createElement('td'); td2.textContent = u.username;
       var td3 = document.createElement('td'); td3.textContent = u.email || '-';
       var td4 = document.createElement('td'); td4.textContent = u.role === 'admin' ? '管理员' : '用户';
-      var td5 = document.createElement('td'); td5.textContent = (u.slot_count || 0) + '（星标:' + (u.github_star ? '是' : '否') + ' 额外:' + u.slots_extra + '）';
+      var td5 = document.createElement('td'); td5.textContent = (u.slot_count || 0) + ' / ' + (2 + (u.github_star ? 3 : 0) + (u.slots_extra || 0)) + '（星标:' + (u.github_star ? '是' : '否') + ' 额外:' + u.slots_extra + '）';
       var td6 = document.createElement('td');
       var roleBtn = document.createElement('button'); roleBtn.className = 'btn btn-sm'; roleBtn.type = 'button'; roleBtn.textContent = u.role === 'admin' ? '取消管理员' : '设为管理员';
       roleBtn.addEventListener('click', function () { api('/api/admin/users/' + u.id + '/role', { method: 'POST', body: { role: u.role === 'admin' ? 'user' : 'admin' } }).then(function () { loadAdmin(); }).catch(function (e) { toast(e.message, 'err'); }); });
       var slotBtn = document.createElement('button'); slotBtn.className = 'btn btn-sm'; slotBtn.type = 'button'; slotBtn.textContent = '开卡槽';
       slotBtn.addEventListener('click', function () {
-        var extra = prompt('授予额外卡槽数量（0-4）？', String(u.slots_extra || 0));
+        var extra = prompt('授予额外卡槽数量（0-18）？\n\n每账号实际总额 = 2（免费）+ 3（星标，如已标记）+ 额外，上限 20。', String(u.slots_extra || 0));
         if (extra === null) return;
         var e2 = parseInt(extra, 10); if (isNaN(e2)) e2 = 0;
-        var star = window.confirm('是否标记该用户已完成 GitHub 星标（解锁第 2 个卡槽）？');
+        var star = window.confirm('是否标记该用户已完成 GitHub 星标（额外解锁 3 个卡槽）？');
         api('/api/admin/users/' + u.id + '/slots', { method: 'POST', body: { extra: e2, githubStar: star } }).then(function () { loadAdmin(); }).catch(function (e) { toast(e.message, 'err'); });
       });
       td6.appendChild(roleBtn); td6.appendChild(slotBtn);
@@ -808,11 +866,12 @@
   function renderAdminSlots(slots) {
     var box = $('#admin-slots-box'); box.textContent = '';
     var t = document.createElement('table');
-    t.innerHTML = '<thead><tr><th>域名</th><th>所有者</th><th>记录</th><th>到期</th><th>操作</th></tr></thead>';
+    t.innerHTML = '<thead><tr><th>域名</th><th>备注</th><th>所有者</th><th>记录</th><th>到期</th><th>操作</th></tr></thead>';
     var tb = document.createElement('tbody');
     slots.forEach(function (s) {
       var tr = document.createElement('tr');
       var td1 = document.createElement('td'); var c = document.createElement('code'); c.textContent = s.name + '.fblog.cyou'; td1.appendChild(c);
+      var tdN = document.createElement('td'); tdN.className = 'small'; tdN.textContent = s.note || '—';
       var td2 = document.createElement('td'); td2.textContent = s.username + (s.email ? ' / ' + s.email : '');
       var td3 = document.createElement('td'); td3.textContent = s.type ? s.type + ' → ' + s.value : s.proxy_target ? '反代 → ' + s.proxy_target : '未使用';
       var td4 = document.createElement('td'); td4.className = 'small muted'; td4.textContent = fmtDate(s.expires_at);
@@ -820,7 +879,7 @@
       var del = document.createElement('button'); del.className = 'btn btn-sm btn-danger'; del.type = 'button'; del.textContent = '回收';
       del.addEventListener('click', function () { if (!window.confirm('确定回收 ' + s.name + '.fblog.cyou 吗？')) return; api('/api/slots/' + s.id, { method: 'DELETE' }).then(function () { loadAdmin(); }).catch(function (e) { toast(e.message, 'err'); }); });
       td5.appendChild(del);
-      tr.appendChild(td1); tr.appendChild(td2); tr.appendChild(td3); tr.appendChild(td4); tr.appendChild(td5);
+      tr.appendChild(td1); tr.appendChild(tdN); tr.appendChild(td2); tr.appendChild(td3); tr.appendChild(td4); tr.appendChild(td5);
       tb.appendChild(tr);
     });
     t.appendChild(tb); box.appendChild(t);
@@ -856,7 +915,7 @@
   });
 
   var MODAL_CONTENT = {
-    rules: '<h4>平台使用规则</h4><ul><li>禁止用于钓鱼、诈骗、盗版、垃圾邮件、赌博等违法或滥用用途；</li><li>每个账号默认 1 个卡槽，最多 5 个，仅限个人学习与项目使用；</li><li>二级域名默认有效期 1 年，剩余 ≤ 6 个月可续期，到期未续将自动释放；</li><li>平台管理员有权依据本规则回收违规域名，无需事先通知。</li></ul>',
+    rules: '<h4>平台使用规则</h4><ul><li>禁止用于钓鱼、诈骗、盗版、垃圾邮件、赌博等违法或滥用用途；</li><li>每个账号默认 2 个卡槽，完成 GitHub 星标可再解锁 3 个（合计 5 个），仅限个人学习与项目使用；</li><li>二级域名默认有效期 1 年，剩余 ≤ 6 个月可续期，到期未续将自动释放；</li><li>平台管理员有权依据本规则回收违规域名，无需事先通知。</li></ul>',
     terms: '<h4>用户协议与免责声明</h4><p>1. 域名归属：平台提供的二级子域名（xxx.fblog.cyou）所有权属于平台，用户仅获得使用权，无法单独办理 ICP 备案。</p><p>2. 内容责任：用户对其域名下所有内容承担全部法律责任，不得违反中华人民共和国法律法规，不得发布侵权、暴力、色情、赌博、诈骗等违法信息；因内容引发的一切纠纷、处罚、赔偿由用户承担。</p><p>3. 服务免责：本服务基于 Cloudflare 海外节点，按现状提供，不做可用性保证；平台不对中断、故障、数据丢失承担责任，并有权随时维护、调整、关停。</p><p>4. 平台处置权：发现或收到有效举报违规内容时，平台有权直接暂停访问、回收域名、删除内容，无需事先通知。</p><p>5. 法律适用：本协议适用中华人民共和国法律，争议协商解决。</p>'
   };
   document.addEventListener('click', function (e) {

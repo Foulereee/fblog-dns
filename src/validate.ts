@@ -72,11 +72,19 @@ export function validateValue(type: string, value: string, rootDomain: string): 
 }
 
 /**
- * 允许被反代的来源后缀：只放行 Cloudflare 自家的部署域名。
+ * 允许被反代的来源后缀。
+ *
  * 这是刻意的安全边界 —— 不限制的话平台就成了任人使用的公开反向代理，
  * 很容易被拿去做滥用流量、绕过对方封禁等事情。
+ *
+ * 只收录「各大云厂商的 serverless / 边缘函数」专用域名，且必须由该厂商完全控制。
+ * **刻意不收录**对象存储（OSS/COS）与通用 API 网关域名：前者等于放行所有 bucket，
+ * 容易被拿来托管恶意文件；后者任何人都能挂，边界太宽。
  */
-export const PROXY_ALLOWED_SUFFIXES = ['.workers.dev', '.pages.dev'];
+export const PROXY_ALLOWED_SUFFIXES = ['.workers.dev', '.pages.dev', '.fcapp.run', '.tencentscf.com'];
+
+/** 上面各后缀的裸域名：用户只填它本身时给一句更有用的提示 */
+const PROXY_BARE_DOMAINS = ['workers.dev', 'pages.dev', 'fcapp.run', 'tencentscf.com'];
 
 /**
  * 校验反代目标地址，返回错误信息或 null。
@@ -94,16 +102,20 @@ export function validateProxyTarget(input: string, rootDomain: string): string |
     return '反代目标需要是完整网址，例如 https://my-worker.my-name.workers.dev';
   }
 
-  if (u.protocol !== 'https:') return '反代目标必须使用 https://（Workers/Pages 都自带 HTTPS）';
+  if (u.protocol !== 'https:') return '反代目标必须使用 https://（这些平台都自带 HTTPS）';
   if (u.username || u.password) return '反代目标不能包含用户名或密码';
 
   const host = u.hostname.toLowerCase();
-  if (host === 'workers.dev' || host === 'pages.dev') {
-    return '请填写具体的项目地址（例如 my-worker.my-name.workers.dev），而不是 workers.dev 本身';
+  if (PROXY_BARE_DOMAINS.includes(host)) {
+    return `请填写具体的项目地址（例如 my-app.xxx${host === 'fcapp.run' ? '.cn-hangzhou' : ''}.${host}），而不是 ${host} 本身`;
   }
   if (!PROXY_ALLOWED_SUFFIXES.some((suffix) => host.endsWith(suffix))) {
-    return '反代目标只支持 Cloudflare Workers（*.workers.dev）或 Pages（*.pages.dev）地址';
+    return (
+      '反代目标只支持这些平台的地址：Cloudflare Workers（*.workers.dev）、Cloudflare Pages（*.pages.dev）、' +
+      '阿里云函数计算（*.fcapp.run）、腾讯云云函数（*.tencentscf.com）'
+    );
   }
+  if (host.includes('_')) return '反代目标的域名部分不能包含下划线';
 
   const rd = rootDomain.toLowerCase();
   if (host === rd || host.endsWith('.' + rd)) {
@@ -119,4 +131,28 @@ export function validateProxyTarget(input: string, rootDomain: string): string |
 /** 把用户输入规整成规范的 origin（`https://host`），仅在 validateProxyTarget 通过后调用 */
 export function normalizeProxyTarget(input: string): string {
   return new URL(input.trim()).origin;
+}
+
+// ---------- 卡槽备注 ----------
+
+/** 卡槽备注的长度上限（按字符数，不是字节数） */
+export const SLOT_NOTE_MAX = 20;
+
+/**
+ * 校验卡槽备注。返回错误信息或 null。
+ * 允许为空（表示清除备注）。
+ */
+export function validateSlotNote(input: unknown): string | null {
+  if (input === null || input === undefined) return null;
+  if (typeof input !== 'string') return '备注必须是文本';
+  if (/[\u0000-\u001f\u007f]/.test(input)) return '备注不能包含控制字符或换行';
+  if ([...input.trim()].length > SLOT_NOTE_MAX) return `备注最多 ${SLOT_NOTE_MAX} 个字符`;
+  return null;
+}
+
+/** 规整备注：去掉首尾空白，空串归一成 null（表示清除） */
+export function normalizeSlotNote(input: unknown): string | null {
+  if (typeof input !== 'string') return null;
+  const s = input.trim();
+  return s ? s : null;
 }

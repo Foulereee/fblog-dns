@@ -17,7 +17,7 @@ import {
   hashEmailCode,
   usernameFromEmail,
 } from './auth';
-import { validateSubdomain, validateValue, validateProxyTarget, normalizeProxyTarget } from './validate';
+import { validateSubdomain, validateValue, validateProxyTarget, normalizeProxyTarget, validateSlotNote, normalizeSlotNote } from './validate';
 import { CfDns } from './cloudflare';
 import { EmailBinding, sendCodeEmail, sendExpiryReminder, sendResetCodeEmail, sendUsageAlert } from './email';
 
@@ -54,8 +54,10 @@ export interface Env {
   USAGE_ALERT_THRESHOLD?: string;
 }
 
-const BASE_SLOTS = 1; // 免费基础卡槽
-const MAX_SLOTS = 5; // 卡槽上限
+const BASE_SLOTS = 2; // 免费基础卡槽（无需任何条件）
+const STAR_BONUS_SLOTS = 3; // GitHub 星标额外解锁（2 + 3 = 5）
+const MAX_SLOTS = 20; // 后台实际上限：管理员最多可授予到这个数
+const PUBLIC_SLOT_CAP = BASE_SLOTS + STAR_BONUS_SLOTS; // 对外口径上限（5）—— 用户侧只出现这个数，20 不对外展示
 const RECORD_LIFETIME_MS = 365 * 24 * 3600 * 1000; // 1 年
 const RENEW_WINDOW_MS = 180 * 24 * 3600 * 1000; // 剩余 <= 6 个月可续期
 const CODE_TTL_MS = 10 * 60 * 1000;
@@ -179,7 +181,7 @@ async function withCf<T>(label: string, fn: () => Promise<T>): Promise<T> {
 }
 
 function maxSlotsFor(u: SessionUser): number {
-  return Math.min(MAX_SLOTS, BASE_SLOTS + (u.github_star ? 1 : 0) + (u.slots_extra ?? 0));
+  return Math.min(MAX_SLOTS, BASE_SLOTS + (u.github_star ? STAR_BONUS_SLOTS : 0) + (u.slots_extra ?? 0));
 }
 
 // ---------- 认证 ----------
@@ -408,6 +410,10 @@ async function handleMe(request: Request, env: Env): Promise<Response> {
     usedSlots: used?.n ?? 0,
     githubStar: user.github_star ?? 0,
     slotsExtra: user.slots_extra ?? 0,
+    // 对外口径上限（5）。用户的实际上限 maxSlots 可能更高（管理员授予），
+    // 但用户侧只用这个数来算「星级阶梯」和展示，20 那个后台上限不对外出现。
+    publicSlotCap: PUBLIC_SLOT_CAP,
+    starBonusSlots: STAR_BONUS_SLOTS,
   });
 }
 
@@ -473,6 +479,16 @@ async function handleListSlots(request: Request, env: Env): Promise<Response> {
   } catch {
     /* proxy_target 列不存在（迁移未执行）：忽略即可 */
   }
+  // 备注同理单独查一次：note 列可能还没迁移，不能拖累整个列表接口
+  const notes = new Map<number, string>();
+  try {
+    const rows = await env.DB.prepare('SELECT id, note FROM subdomains WHERE user_id = ?1 AND note IS NOT NULL')
+      .bind(user.id)
+      .all<{ id: number; note: string }>();
+    for (const r of rows.results ?? []) notes.set(r.id, r.note);
+  } catch {
+    /* note 列不存在（迁移未执行）：忽略即可 */
+  }
   const out = [];
   for (const s of slots.results ?? []) {
     const rec = await env.DB.prepare('SELECT type, value FROM records WHERE subdomain_id = ?1').bind(s.id).first<{ type: string; value: string }>();
@@ -489,6 +505,7 @@ async function handleListSlots(request: Request, env: Env): Promise<Response> {
       expired: remaining <= 0,
       ddns_token: s.ddns_token ?? '',
       proxy_target: proxyTargets.get(s.id) ?? null,
+      note: notes.get(s.id) ?? null,
     });
   }
   return json({ slots: out, rootDomain: env.ROOT_DOMAIN, maxSlots: maxSlotsFor(user) });
@@ -719,19 +736,26 @@ async function handleAdminSetSlots(request: Request, env: Env, path: string): Pr
 
 async function handleAdminSlots(request: Request, env: Env): Promise<Response> {
   await requireAdmin(request, env);
-  const base = (proxyCol: string) =>
+  const base = (proxyCol: string, noteCol: string) =>
     `SELECT s.id, s.name, s.expires_at, s.created_at, u.username, u.email,
             ${proxyCol} AS proxy_target,
+            ${noteCol} AS note,
             (SELECT r.type FROM records r WHERE r.subdomain_id = s.id) AS type,
             (SELECT r.value FROM records r WHERE r.subdomain_id = s.id) AS value
      FROM subdomains s JOIN users u ON u.id = s.user_id ORDER BY s.id DESC`;
   try {
-    const rows = await env.DB.prepare(base('s.proxy_target')).all();
+    const rows = await env.DB.prepare(base('s.proxy_target', 's.note')).all();
     return json({ slots: rows.results ?? [] });
   } catch {
-    // proxy_target 列不存在（迁移未执行）：退回旧查询，管理端照常可用
-    const rows = await env.DB.prepare(base('NULL')).all();
-    return json({ slots: rows.results ?? [] });
+    // note 列不存在（migration-note.sql 未执行）：退回不含备注的查询
+    try {
+      const rows = await env.DB.prepare(base('s.proxy_target', 'NULL')).all();
+      return json({ slots: rows.results ?? [] });
+    } catch {
+      // proxy_target 也不存在（连 migration-proxy.sql 都没跑）：管理端仍可用
+      const rows = await env.DB.prepare(base('NULL', 'NULL')).all();
+      return json({ slots: rows.results ?? [] });
+    }
   }
 }
 
@@ -1315,6 +1339,35 @@ async function handleDeleteProxy(request: Request, env: Env, path: string): Prom
   return json({ ok: true });
 }
 
+/**
+ * 设置卡槽备注（用户给这个子域名起的名字）。
+ * 传空串或空白表示清除备注。备注只是用户自己的整理标签，不参与 DNS，也不要求唯一。
+ */
+async function handleSetNote(request: Request, env: Env, path: string): Promise<Response> {
+  const user = await requireUser(request, env);
+  const m = path.match(/^\/api\/slots\/(\d+)\/note$/);
+  if (!m) return json({ error: 'not found' }, 404);
+  const id = Number(m[1]);
+  const slot = await env.DB.prepare('SELECT id FROM subdomains WHERE id = ?1 AND user_id = ?2')
+    .bind(id, user.id)
+    .first();
+  if (!slot) return json({ error: '卡槽不存在或无权操作' }, 404);
+
+  const body = await readJson(request);
+  const err = validateSlotNote(body?.note);
+  if (err) return json({ error: err }, 400);
+  const note = normalizeSlotNote(body?.note);
+
+  try {
+    await env.DB.prepare('UPDATE subdomains SET note = ?1, updated_at = ?2 WHERE id = ?3')
+      .bind(note, new Date().toISOString(), id)
+      .run();
+  } catch {
+    return json({ error: '数据库尚未迁移（缺少 note 列），请先执行 migration-note.sql' }, 500);
+  }
+  return json({ ok: true, id, note });
+}
+
 // ---------- 入口 ----------
 export default {
   async fetch(request: Request, env: Env, ctx: ExecutionContext): Promise<Response> {
@@ -1415,6 +1468,9 @@ export default {
       }
       if (request.method === 'DELETE' && (mm = path.match(/^\/api\/slots\/(\d+)\/record$/))) {
         return await handleDeleteRecord(request, env, path);
+      }
+      if (request.method === 'POST' && (mm = path.match(/^\/api\/slots\/(\d+)\/note$/))) {
+        return await handleSetNote(request, env, path);
       }
       if (request.method === 'POST' && (mm = path.match(/^\/api\/slots\/(\d+)\/renew$/))) {
         return await handleRenewSlot(request, env, path);

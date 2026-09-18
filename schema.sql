@@ -48,6 +48,8 @@ CREATE TABLE IF NOT EXISTS subdomains (
   reminder_level INTEGER NOT NULL DEFAULT 0,
   -- 反代目标（用户自己的 Cloudflare Workers / Pages 地址）；NULL = 未开启反代
   proxy_target TEXT,
+  -- 用户给该子域名起的备注（名字），纯整理用，不参与 DNS
+  note TEXT,
   created_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ', 'now')),
   updated_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ', 'now'))
 );

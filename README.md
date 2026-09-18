@@ -107,11 +107,18 @@ curl -X POST https://fblog-dns.<你的子域>.workers.dev/api/admin/users \
 
 ### 路线 A（推荐，免费账号也能用）：平台反代
 
-用户把 `xxx.fblog.cyou` 指向自己在 Cloudflare 上部署的 Workers / Pages ——
+用户把 `xxx.fblog.cyou` 指向自己在云厂商上部署的 Serverless 应用 ——
 **代码、部署、更新都在用户自己账号里**，平台只做一层透明转发。
 
-1. 用户在自己的 Cloudflare 账号部署 Workers（得到 `my-worker.my-name.workers.dev`）
-   或 Pages（得到 `my-project.pages.dev`）；
+1. 用户在自己的账号部署，拿到默认访问域名：
+
+   | 平台 | 地址形如 |
+   | --- | --- |
+   | Cloudflare Workers | `my-worker.my-name.workers.dev` |
+   | Cloudflare Pages | `my-project.pages.dev` |
+   | 阿里云函数计算 FC | `my-func.cn-hangzhou.fcapp.run` |
+   | 腾讯云云函数 SCF | `appid-urlid.ap-guangzhou.tencentscf.com` |
+
 2. 用户到本平台「我的子域名」→ 该卡槽点 **开启反代** → 填入该地址 → 保存；
 3. 访问 `https://xxx.fblog.cyou` 即转发到用户的部署。
 
@@ -119,6 +126,21 @@ curl -X POST https://fblog-dns.<你的子域>.workers.dev/api/admin/users \
 再 `fetch()` 转发到用户登记的目标。转发时会剥掉逐跳首部、补上
 `X-Forwarded-Host` / `X-Forwarded-Proto` / `X-Real-IP` / `X-Original-Host`，
 并把重定向响应里的 `Location` 从目标主机改回用户看到的域名。
+
+**反代白名单（安全边界，只认这四类后缀）**
+
+白名单写在 `src/validate.ts` 的 `PROXY_ALLOWED_SUFFIXES`：
+
+```
+*.workers.dev        Cloudflare Workers
+*.pages.dev          Cloudflare Pages
+*.fcapp.run          阿里云函数计算 FC（3.0 / Web 函数默认域名）
+*.tencentscf.com     腾讯云云函数 SCF（Function URL）
+```
+
+**刻意不收录**：对象存储（`*.oss-*.aliyuncs.com`、`*.cos.*.myqcloud.com`）与通用 API 网关
+（`*.apigw.tencentcs.com`）—— 前者等于放行所有 bucket、容易被拿来托管恶意文件，后者任何人
+都能挂、边界太宽。填 `https://baidu.com` 这类任意网址会被拒绝，否则平台就成了公开反向代理。
 
 **🔴 上线前的一次性前置条件（漏了会发现子域名根本不解析）：**
 
@@ -143,6 +165,7 @@ npx wrangler d1 execute fblog-dns-db --remote --file=./migration-proxy.sql
 
 ```bash
 npx wrangler d1 execute fblog-dns-db --remote --file=./migration-usage.sql
+npx wrangler d1 execute fblog-dns-db --remote --file=./migration-note.sql
 ```
 
 > ⚠️ **粘贴到 D1 Console 的坑**：SQLite 的 `--` 是「注释到行尾」。有些编辑器/网页在粘贴时会把
@@ -155,7 +178,7 @@ npx wrangler d1 execute fblog-dns-db --remote --file=./migration-usage.sql
 
 > 代价：反代请求会消耗**平台自己**的 Workers 额度（免费 10 万请求/天），且平台能看到这些流量。
 > 额度是**全平台共享**的 —— 一个被刷的站点能拖垮所有人，所以务必确认下文的三个防护已生效。
-> 另外反代只放行 `*.workers.dev` 与 `*.pages.dev` 目标，这是刻意的安全边界 ——
+> 另外反代只放行上文那四类后缀，这是刻意的安全边界 ——
 > 不限制的话平台就成了任人使用的公开反向代理。
 
 ### 路线 B（仅 Business+ 套餐可用）：CNAME setup
@@ -168,6 +191,54 @@ npx wrangler d1 execute fblog-dns-db --remote --file=./migration-usage.sql
 > **两条路互斥**：同一个卡槽要么填 DNS 记录（含路线 B 的 CNAME），要么开反代。
 > 同时设置时请求会被 DNS 直接解析走、根本到不了 Worker，所以平台会直接拦住并提示原因。
 > 面向用户的图文说明见 `/how`。
+
+## 卡槽规则（设计要点：对外只说 5，后台其实能到 20）
+
+`src/index.ts` 顶部三个常量决定一切：
+
+```
+BASE_SLOTS      = 2   // 免费基础，无需任何条件
+STAR_BONUS_SLOTS = 3  // GitHub 星标额外解锁 → 2 + 3 = 5
+MAX_SLOTS       = 20  // 后台实际上限（管理员最多授予到这里）
+PUBLIC_SLOT_CAP = 5   // 对外口径 —— 用户侧只出现这个数
+```
+
+`maxSlotsFor(u) = min(20, 2 + (星标 ? 3 : 0) + 管理员授予的额外数)`
+
+| 阶段 | 上限 | 用户看到什么 |
+| --- | --- | --- |
+| 新账号 | 2 | 「你已用满 2 个免费卡槽。给项目点一个 GitHub Star，即可再解锁 3 个卡槽。」 |
+| 完成星标 | 5 | 「你已解锁全部 5 个卡槽。想解锁更多？请联系管理员。」 |
+| 管理员额外授予 | 至多 20 | 面板如实显示 `已用 / 实际上限`，不提 20 |
+
+**为什么 20 不对外展示**：避免所有用户一上来就索要 20 个。用户侧任何位置
+（落地页、规则页、卡槽页提示）都只出现 5；管理员面板里则如实显示 `已用 / 实际上限`
+和 `额外:N`，方便你判断该给谁加。
+
+**关于 GitHub 星标的现状**：目前**仍是管理员手工标记**的（管理后台 → 所有账户 → 开卡槽 →
+确认框「是否标记该用户已完成 GitHub 星标」）。自动验证尚未实现 —— 要做的话有两条路，
+安全性差别很大：
+
+- **GitHub OAuth 授权验证**（可靠）：用户点「用 GitHub 验证」跳转授权，平台用拿到的 token
+  调 `GET /user/starred/{owner}/{repo}` 判断。无法伪造。需要你新建一个 GitHub OAuth App
+  并把 client_id / client_secret 配进来。
+- **用户自填 GitHub 用户名，平台查 API**（不可靠）：零配置立刻能用，但**填一个已星标用户的
+  用户名就能白拿 3 个卡槽**，等于没有门槛。
+
+## 反向代理的完整转发语义
+
+转发时会剥掉逐跳首部（`connection` / `keep-alive` / `transfer-encoding` / `upgrade` 等），
+删掉原始 `host`，并补上：
+
+```
+X-Forwarded-Host: <用户看到的域名>      X-Forwarded-Proto: https
+X-Real-IP: <访客 IP>                    X-Forwarded-For: <访客 IP>
+X-Original-Host: <用户看到的域名>
+```
+
+`fetch` 用 `redirect: 'manual'`：**非重定向响应原样返回**（不重建，避免丢掉
+`content-length` 等首部）；只有重定向响应会被重建，把 `Location` 里的目标主机改回
+用户看到的域名。目标只填到域名（不许带路径 / 查询串 / 锚点），所以路径与查询串原样透传。
 
 ## 六、上线后的安全清单（务必做）
 
@@ -243,6 +314,7 @@ npx wrangler d1 execute fblog-dns-db --remote --file=./migration-usage.sql
 | DELETE | `/api/slots/:id/record` | 删除该卡槽的 DNS 记录 |
 | POST | `/api/slots/:id/proxy` | 开启/更新反代，`{target:"https://x.y.workers.dev"}` |
 | DELETE | `/api/slots/:id/proxy` | 关闭反代 |
+| POST | `/api/slots/:id/note` | 设置卡槽备注，`{note:"我的博客"}`；传空串表示清除 |
 | POST | `/api/admin/users` | 管理员建号（Bearer ADMIN_PASSWORD） |
 | GET | `/api/admin/usage` | 管理员查看反代用量（近 14 天）与缓存/限流配置 |
 
