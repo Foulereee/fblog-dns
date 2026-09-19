@@ -6,25 +6,23 @@
 <meta name="description" content="fblog.cyou 免费二级域名平台完整使用教程：如何注册与申请子域名、A/AAAA/CNAME 记录怎么填、Cloudflare / 阿里云 / 腾讯云边缘节点部署、DDNS 动态解析与排错。">
 <title>如何使用 · fblog.cyou 免费二级域名</title>
 <meta name="robots" content="index,follow">
+<!-- 全站统一导航样式（四个页面共用） -->
+<link rel="stylesheet" href="/nav.css">
 <style>
   :root { --paper:#f6f1e6; --paper2:#eee6d5; --card:#fffdf7; --ink:#1c1712; --ink-soft:#5c5343; --ink-mid:#3d3527; --line:#e2d8c3; --accent:#c2410c; --ok:#15803d; --radius:14px; --serif:Georgia,"Times New Roman","Songti SC","Noto Serif SC",serif; --mono:ui-monospace,Consolas,monospace; }
   * { box-sizing:border-box; margin:0; padding:0; }
   html { scroll-behavior:smooth; }
   body { font-family:system-ui,-apple-system,"PingFang SC","Microsoft YaHei","Segoe UI",sans-serif; background:var(--paper); color:var(--ink); line-height:1.85; }
   nav.top { position:sticky; top:0; z-index:50; background:rgba(246,241,230,.9); backdrop-filter:blur(12px); border-bottom:1px solid var(--line); }
-  .nav-inner { display:flex; align-items:center; justify-content:space-between; height:60px; }
-  .nav-inner, .foot-inner { max-width:1180px; margin:0 auto; padding:0 22px; }
-  .logo { font-family:var(--serif); font-size:20px; font-weight:700; color:var(--ink); text-decoration:none; }
-  .logo .dot { color:var(--accent); }
-  .nav-links a { color:var(--ink-soft); text-decoration:none; font-size:14px; margin-left:18px; }
-  .nav-links a:hover { color:var(--ink); }
+  /* 导航条与按钮样式统一放在 nav.css（四个页面共用） */
+  .foot-inner { max-width:1060px; margin:0 auto; padding:0 22px; }
 
-  /* ---------- 布局：正文 + 右侧目录 ---------- */
-  .layout { max-width:1180px; margin:0 auto; padding:0 22px; display:grid; grid-template-columns:minmax(0,820px) 250px; gap:44px; align-items:start; justify-content:center; }
-  .layout.toc-collapsed { grid-template-columns:minmax(0,820px) 46px; }
+  /* ---------- 布局：左侧目录 + 右侧正文 ---------- */
+  .layout { max-width:1180px; margin:0 auto; padding:0 22px; display:grid; grid-template-columns:250px minmax(0,820px); gap:44px; align-items:start; justify-content:center; }
+  .layout.toc-collapsed { grid-template-columns:46px minmax(0,820px); }
   main { min-width:0; padding-bottom:20px; }
 
-  /* ---------- 右侧可收起目录 ---------- */
+  /* ---------- 左侧可收起目录 ---------- */
   .toc { position:sticky; top:76px; background:var(--card); border:1px solid var(--line); border-radius:12px; padding:14px 0; max-height:calc(100vh - 100px); overflow-y:auto; font-size:13.5px; transition:padding .18s; }
   .toc-head { display:flex; align-items:center; justify-content:space-between; gap:8px; padding:0 14px 10px; border-bottom:1px solid var(--line); }
   .toc-title { font-family:var(--serif); font-size:15px; color:var(--ink); white-space:nowrap; }
@@ -73,10 +71,10 @@
   footer a:hover { color:var(--ink); text-decoration-color:var(--ink); }
   .foot-sep { opacity:.55; }
 
-  /* ---------- 窄屏：目录变成右下角浮动按钮 ---------- */
+  /* ---------- 窄屏：目录变成左下角浮动按钮 ---------- */
   @media (max-width:1079px) {
     .layout, .layout.toc-collapsed { grid-template-columns:minmax(0,1fr); }
-    .toc { position:fixed; right:14px; bottom:14px; top:auto; z-index:60; width:min(300px, calc(100vw - 28px)); max-height:min(62vh, 440px); box-shadow:0 16px 44px -14px rgba(28,23,18,.42); }
+    .toc { position:fixed; left:14px; bottom:14px; top:auto; z-index:60; width:min(300px, calc(100vw - 28px)); max-height:min(62vh, 440px); box-shadow:0 16px 44px -14px rgba(28,23,18,.42); }
     .toc.collapsed { width:auto; border-radius:10px; }
   }
 </style>
@@ -84,10 +82,45 @@
 <body>
 <nav class="top"><div class="nav-inner">
   <a class="logo" href="/">fblog<span class="dot">.cyou</span></a>
-  <div class="nav-links"><a href="/">首页</a><a href="/rules">使用规则</a><a href="/terms">用户协议</a></div>
+  <div class="nav-links" id="nav-links"></div>
+  <div class="nav-cta" id="nav-cta"></div>
 </div></nav>
 
 <div class="layout" id="layout">
+<!-- 目录放在正文之前：既是视觉上的左侧栏，也是键盘 Tab 的合理顺序 -->
+<nav class="toc" id="toc" aria-label="页内目录">
+  <div class="toc-head">
+    <b class="toc-title">目录</b>
+    <button class="toc-toggle" id="toc-toggle" type="button" aria-controls="toc" aria-expanded="true" aria-label="收起目录">«</button>
+  </div>
+  <ol class="toc-list">
+    <li><a href="#apply">如何申请</a>
+      <ol>
+        <li><a href="#apply-register">注册账号</a></li>
+        <li><a href="#apply-claim">申请子域名</a></li>
+        <li><a href="#apply-slots">卡槽与配额</a></li>
+        <li><a href="#apply-faq">申请常见问题</a></li>
+      </ol>
+    </li>
+    <li><a href="#use">如何使用</a>
+      <ol>
+        <li><a href="#use-types">三种记录类型</a></li>
+        <li><a href="#use-a">A 记录（IPv4）</a></li>
+        <li><a href="#use-aaaa">AAAA 记录（IPv6）</a></li>
+        <li><a href="#use-cname">CNAME 记录</a></li>
+        <li><a href="#edge-cloudflare">边缘节点 · Cloudflare</a></li>
+        <li><a href="#edge-aliyun">边缘节点 · 阿里云</a></li>
+        <li><a href="#edge-tencent">边缘节点 · 腾讯云</a></li>
+        <li><a href="#edge-choose">三家怎么选</a></li>
+        <li><a href="#use-verify">验证与排错</a></li>
+      </ol>
+    </li>
+    <li><a href="#ddns">DDNS 动态解析</a></li>
+    <li><a href="#renew">续期与到期</a></li>
+    <li><a href="#faq">还是不行？</a></li>
+  </ol>
+</nav>
+
 <main>
   <h1>如何使用</h1>
   <p class="lede">从注册账号到把 <code>xxx.fblog.cyou</code> 真正跑起来 —— 包含 A / AAAA / CNAME 记录怎么填，以及 Cloudflare、阿里云、腾讯云三家边缘节点的部署教程。</p>
@@ -411,39 +444,6 @@ curl "https://dns.fblog.cyou/api/ddns?token=你的令牌"</code></pre>
     <li>使用前请务必读一遍 <a href="/rules">使用规则</a> 与 <a href="/terms">用户协议与免责声明</a> —— 违规域名会被回收，且可能导致整个 <code>fblog.cyou</code> 受影响。</li>
   </ul>
 </main>
-
-<nav class="toc" id="toc" aria-label="页内目录">
-  <div class="toc-head">
-    <b class="toc-title">目录</b>
-    <button class="toc-toggle" id="toc-toggle" type="button" aria-controls="toc" aria-expanded="true" aria-label="收起目录">«</button>
-  </div>
-  <ol class="toc-list">
-    <li><a href="#apply">如何申请</a>
-      <ol>
-        <li><a href="#apply-register">注册账号</a></li>
-        <li><a href="#apply-claim">申请子域名</a></li>
-        <li><a href="#apply-slots">卡槽与配额</a></li>
-        <li><a href="#apply-faq">申请常见问题</a></li>
-      </ol>
-    </li>
-    <li><a href="#use">如何使用</a>
-      <ol>
-        <li><a href="#use-types">三种记录类型</a></li>
-        <li><a href="#use-a">A 记录（IPv4）</a></li>
-        <li><a href="#use-aaaa">AAAA 记录（IPv6）</a></li>
-        <li><a href="#use-cname">CNAME 记录</a></li>
-        <li><a href="#edge-cloudflare">边缘节点 · Cloudflare</a></li>
-        <li><a href="#edge-aliyun">边缘节点 · 阿里云</a></li>
-        <li><a href="#edge-tencent">边缘节点 · 腾讯云</a></li>
-        <li><a href="#edge-choose">三家怎么选</a></li>
-        <li><a href="#use-verify">验证与排错</a></li>
-      </ol>
-    </li>
-    <li><a href="#ddns">DDNS 动态解析</a></li>
-    <li><a href="#renew">续期与到期</a></li>
-    <li><a href="#faq">还是不行？</a></li>
-  </ol>
-</nav>
 </div>
 
 <footer><div class="foot-inner"><div class="foot-line">
@@ -456,9 +456,14 @@ curl "https://dns.fblog.cyou/api/ddns?token=你的令牌"</code></pre>
   <a href="/terms">用户协议与免责声明</a>
 </div></div></footer>
 
+<!-- 全站统一导航（四个页面共用，见 nav.js） -->
+<script src="/nav.js"></script>
 <script>
 (function () {
   document.getElementById('days').textContent = Math.max(1, Math.floor((Date.now() - Date.UTC(2026, 8, 14)) / 86400000));
+
+  // 右上角账号区（含登录后的用户名），与首页那几个页面完全一致
+  if (window.initSiteNav) window.initSiteNav('how');
 
   var layout = document.getElementById('layout');
   var toc = document.getElementById('toc');

@@ -1,0 +1,38 @@
+/*
+ * 全站统一导航样式（配合 nav.js）
+ * ---------------------------------------------------------------------------
+ * 四个页面（首页 / 如何使用 / 使用规则 / 用户协议）共用。
+ * 按钮样式也放在这里，保证「免费注册」「控制台」在各页长得完全一样。
+ *
+ * 各页的正文宽度可以不同（首页 1060、规则页 800），但导航条统一 1060，
+ * 否则加上账号区后在窄导航里会挤爆。
+ */
+
+.nav-inner { max-width:1060px; margin:0 auto; padding:0 22px; display:flex; align-items:center; justify-content:space-between; height:62px; gap:12px; }
+
+.logo { font-family:var(--serif); font-size:21px; font-weight:700; letter-spacing:.3px; color:var(--ink); text-decoration:none; }
+.logo .dot { color:var(--accent); }
+
+.nav-links { display:flex; gap:22px; align-items:center; }
+.nav-links a { color:var(--ink-soft); text-decoration:none; font-size:14px; cursor:pointer; white-space:nowrap; }
+.nav-links a:hover { color:var(--ink); }
+.nav-links a.active { color:var(--accent); font-weight:600; }
+
+.nav-cta { display:flex; gap:10px; align-items:center; }
+/* 当前登录的用户名，位于「退出」左边 */
+.nav-who { font-size:13.5px; color:var(--ink-soft); max-width:130px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+
+.btn { display:inline-flex; align-items:center; justify-content:center; gap:6px; border:1px solid var(--line); background:transparent; color:var(--ink); border-radius:10px; padding:9px 18px; font-size:14px; font-weight:600; cursor:pointer; text-decoration:none; transition:all .18s; white-space:nowrap; }
+.btn:hover { border-color:var(--ink); transform:translateY(-1px); }
+.btn-primary { background:var(--ink); border:1px solid var(--ink); color:var(--paper); }
+.btn-primary:hover { background:var(--accent); border-color:var(--accent); color:#fff; }
+.btn-sm { padding:5px 13px; font-size:13px; border-radius:8px; }
+
+/* 窄屏：账号区优先，站内链接换到第二行居中；用户名太占地方就先藏起来 */
+@media (max-width:720px) {
+  .nav-inner { height:auto; flex-wrap:wrap; padding:8px 22px; row-gap:4px; }
+  .nav-links { order:3; flex-basis:100%; justify-content:center; gap:16px; padding-bottom:4px; }
+  .nav-links a { font-size:13px; }
+  .nav-who { display:none; }
+  .btn { padding:6px 12px; font-size:12.5px; }
+}

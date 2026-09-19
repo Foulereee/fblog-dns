@@ -7,6 +7,8 @@
 <title>fblog.cyou · 免费二级域名分发平台</title>
 <meta name="robots" content="index,follow">
 <link rel="canonical" href="https://dns.fblog.cyou/">
+<!-- 全站统一导航样式（四个页面共用） -->
+<link rel="stylesheet" href="/nav.css">
 <style>
   :root {
     --paper: #f6f1e6; --paper2: #eee6d5; --card: #fffdf7;
@@ -23,20 +25,10 @@
   #bg { position: fixed; inset: 0; z-index: -1; pointer-events: none; }
   .wrap { max-width: 1060px; margin: 0 auto; padding: 0 22px; position: relative; }
   nav { position: sticky; top: 0; z-index: 50; background: rgba(246,241,230,.85); backdrop-filter: blur(14px); border-bottom: 1px solid var(--line); }
-  .nav-inner { display: flex; align-items: center; justify-content: space-between; height: 62px; gap: 12px; }
-  .logo { font-family: var(--serif); font-size: 21px; font-weight: 700; letter-spacing:.3px; color: var(--ink); text-decoration: none; }
-  .logo .dot { color: var(--accent); }
-  .nav-links { display: flex; gap: 22px; align-items: center; }
-  .nav-links a { color: var(--ink-soft); text-decoration: none; font-size: 14px; cursor: pointer; }
-  .nav-links a:hover { color: var(--ink); }
-  .nav-cta { display: flex; gap: 10px; align-items: center; }
-  .btn { display: inline-flex; align-items:center; justify-content:center; gap:6px; border:1px solid var(--line); background:transparent; color:var(--ink); border-radius:10px; padding:9px 18px; font-size:14px; font-weight:600; cursor:pointer; text-decoration:none; transition:all .18s; }
-  .btn:hover { border-color: var(--ink); transform: translateY(-1px); }
-  .btn-primary { background: var(--ink); border:1px solid var(--ink); color: var(--paper); }
-  .btn-primary:hover { background: var(--accent); border-color: var(--accent); color:#fff; }
+  /* 导航条与按钮样式已抽到 nav.css（四个页面共用），此处不再重复定义。
+     仅保留本页独有的 .btn-danger。 */
   .btn-danger { border-color: rgba(185,28,28,.45); color: var(--danger); }
   .btn-danger:hover { background: rgba(185,28,28,.08); border-color: var(--danger); color: var(--danger); }
-  .btn-sm { padding:5px 13px; font-size:13px; border-radius:8px; }
   .btn[disabled] { opacity:.45; cursor:not-allowed; }
   .hero { padding: 80px 0 56px; text-align: center; }
   .hero .badge { display:inline-block; font-size:12px; color:var(--accent); border:1px solid rgba(194,65,12,.3); background:rgba(194,65,12,.06); padding:4px 14px; border-radius:99px; margin-bottom:20px; letter-spacing:.5px; }
@@ -151,7 +143,8 @@
   .reveal.in { opacity:1; transform:none; }
   @media (max-width: 640px) {
     .hero h1 { font-size:34px; }
-    .nav-links { display:none; }
+    /* 原来这里直接 display:none 隐藏导航链接，与 nav.css 的「换到第二行」不一致，
+       导致手机上首页看不到站内链接、其它页却看得到。统一交给 nav.css 处理。 */
     .form-row { flex-direction:column; gap:0; }
     table { font-size:12.5px; }
     .dash-layout { flex-direction:column; }
@@ -167,11 +160,7 @@
 <nav>
   <div class="wrap nav-inner">
     <a class="logo" href="#" id="nav-logo">fblog<span class="dot">.cyou</span></a>
-    <div class="nav-links">
-      <a data-nav="features">功能</a>
-      <a href="/how">如何使用</a>
-      <a href="/rules">使用规则</a>
-    </div>
+    <div class="nav-links" id="nav-links"></div>
     <div class="nav-cta" id="nav-cta"></div>
   </div>
 </nav>
@@ -420,6 +409,8 @@
 
 <div id="toast"></div>
 
+<!-- 全站统一导航（四个页面共用，见 nav.js） -->
+<script src="/nav.js"></script>
 <script>
 (function () {
   'use strict';
@@ -475,31 +466,34 @@
   }
 
   function renderNav() {
-    var box = $('#nav-cta'); box.textContent = '';
-    var onDash = state.view === 'dash';
-    // 当前所在页面对应的那个按钮才是深色（btn-primary），其余是浅色。
-    // 之前这里是写死的：控制台永远 btn-primary、首页永远浅色，跟当前页面无关。
-    if (state.user) {
-      var home = document.createElement('a'); home.className = 'btn btn-sm' + (onDash ? '' : ' btn-primary'); home.href = '#'; home.textContent = '首页';
-      home.addEventListener('click', function (e) { e.preventDefault(); showView('landing'); });
-      var dash = document.createElement('a'); dash.className = 'btn btn-sm' + (onDash ? ' btn-primary' : ''); dash.href = '#'; dash.textContent = '控制台';
-      dash.addEventListener('click', function (e) { e.preventDefault(); showView('dash'); });
-      var out = document.createElement('a'); out.className = 'btn btn-sm'; out.href = '#'; out.textContent = '退出';
-      out.addEventListener('click', function (e) { e.preventDefault(); api('/api/logout', { method: 'POST' }).then(function () { state.user = null; state.role = 'user'; showView('landing'); }).catch(function () { showView('landing'); }); });
-      box.appendChild(home); box.appendChild(dash); box.appendChild(out);
-    } else {
-      var login = document.createElement('a'); login.className = 'btn btn-sm' + (state.view === 'login' ? ' btn-primary' : ''); login.href = '#'; login.textContent = '登录';
-      login.addEventListener('click', function (e) { e.preventDefault(); showView('login'); });
-      var reg = document.createElement('a'); reg.className = 'btn btn-sm' + ((state.view === 'register' || !onDash) ? ' btn-primary' : ''); reg.href = '#'; reg.textContent = '免费注册';
-      reg.addEventListener('click', function (e) { e.preventDefault(); showView('register'); });
-      box.appendChild(login); box.appendChild(reg);
-    }
+    // 按钮本身由 /nav.js 渲染 —— 四个页面共用同一套，避免各页长得不一样。
+    // 首页是单页应用，切视图不刷新页面，所以通过 hooks 覆盖默认跳转行为。
+    if (!window.renderSiteCta) return;
+    window.renderSiteCta('nav-cta', state.user, {
+      active: state.view,
+      hooks: {
+        home: function () { showView('landing'); },
+        dash: function () { showView('dash'); },
+        login: function () { showView('login'); },
+        register: function () { showView('register'); },
+        logout: function () { state.user = null; state.role = 'user'; showView('landing'); }
+      }
+    });
   }
 
+  window.renderSiteLinks('nav-links', null);
   $('#nav-logo').addEventListener('click', function (e) { e.preventDefault(); showView('landing'); });
-  document.querySelector('[data-nav="features"]').addEventListener('click', function (e) {
-    e.preventDefault(); showView('landing');
-    setTimeout(function () { var el = document.getElementById('features'); if (el) el.scrollIntoView({ behavior: 'smooth' }); }, 60);
+  // 「功能」在首页不是整页跳转，而是切回落地页视图再滚到功能区
+  $('#nav-links').addEventListener('click', function (e) {
+    var t = e.target;
+    while (t && t !== this && !(t.tagName === 'A' && t.getAttribute('href') === '/#features')) t = t.parentNode;
+    if (!t || t === this) return;
+    e.preventDefault();
+    showView('landing');
+    setTimeout(function () {
+      var el = document.getElementById('features');
+      if (el) el.scrollIntoView({ behavior: 'smooth' });
+    }, 60);
   });
 
   function loadStats() {
