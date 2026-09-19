@@ -375,14 +375,21 @@ fblog-dns/
 ├── schema.sql            # D1 表结构
 ├── migration-*.sql       # 增量迁移（已有库按需执行；全新安装只需 schema.sql）
 ├── public/
-│   └── index.html        # 前端单页（静态资源，经 env.ASSETS 提供）
+│   ├── index.html        # 前端单页（静态资源，经 env.ASSETS 提供）
+│   ├── nav.js / nav.css  # 全站统一导航（四个页面共用）
+│   ├── how.html          # 如何使用（左侧可收起目录）
+│   ├── rules.html        # 使用规则（可接受使用政策）
+│   └── terms.html        # 用户协议与免责声明
 ├── src/
 │   ├── index.ts          # 路由与业务逻辑
 │   ├── auth.ts           # PBKDF2 密码哈希 + HMAC 会话
-│   ├── validate.ts       # 子域名/记录值校验、保留字
+│   ├── email.ts          # 多通道邮件发送（Resend → Brevo → Cloudflare，自动降级）
+│   ├── validate.ts       # 子域名/记录值校验、保留字、反代白名单
 │   └── cloudflare.ts     # Cloudflare DNS API 封装
 ├── scripts/
 │   └── smoke-test.ps1    # 本地端到端冒烟测试
+├── LICENSE               # AGPL-3.0
+├── SECURITY.md           # 安全政策 / 漏洞报告方式
 └── .dev.vars.example     # 本地开发配置模板
 ```
 
@@ -400,3 +407,15 @@ pwsh -File scripts\smoke-test.ps1
 try/catch 之外，会变成整个 Worker 的未捕获异常（表现为 500 + 原始堆栈），
 前端会收到无意义的报错。所有内部会抛错的调用（`withCf`、`requireUser` 等）
 同理需要在 await 内被捕获。
+
+## 许可证
+
+Copyright (C) 2026 **Foulereee**
+
+本项目以 **GNU Affero General Public License v3.0** 授权，全文见 [LICENSE](./LICENSE)。
+
+这意味着：你可以自由使用、修改和分发本代码，但**如果你修改后把它作为网络服务对外提供，
+必须向该服务的所有用户提供修改后的完整源码**（AGPL-3.0 第 13 条）。本平台本身就是一个
+网络服务，所以这条正是选择 AGPL 而非 MIT 的原因。
+
+安全问题的报告方式见 [SECURITY.md](./SECURITY.md) —— 请勿开公开 issue。
