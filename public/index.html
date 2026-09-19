@@ -386,6 +386,10 @@
           <h3 style="margin-bottom:10px;font-family:var(--serif)">反向代理用量</h3>
           <div id="admin-usage-box">加载中…</div>
         </div>
+        <div class="dash-card" style="margin-bottom:16px">
+          <h3 style="margin-bottom:10px;font-family:var(--serif)">邮件通道</h3>
+          <div id="admin-mail-box">加载中…</div>
+        </div>
         <div class="dash-card">
           <h3 style="margin-bottom:10px;font-family:var(--serif)">保留域名</h3>
           <div class="form-row">
@@ -806,6 +810,77 @@
     api('/api/admin/slots').then(function (d) { renderAdminSlots(d.slots); }).catch(function () {});
     api('/api/admin/reserved').then(function (d) { renderReserved(d.reserved); }).catch(function () {});
     api('/api/admin/usage').then(function (d) { renderAdminUsage(d); }).catch(function () {});
+    api('/api/admin/mail').then(function (d) { renderAdminMail(d); }).catch(function () {});
+  }
+
+  /**
+   * 邮件通道面板：看清「哪家配了、今天用了多少、还剩多少」，并能直接发一封测试邮件。
+   * 免费邮件服务的日配额很小（Resend 100/天），多接几家才能叠加出可用的发信量。
+   */
+  function renderAdminMail(d) {
+    var box = $('#admin-mail-box'); if (!box) return; box.textContent = '';
+
+    var head = document.createElement('div');
+    head.style.cssText = 'margin-bottom:10px;color:#5b5147;font-size:14px;line-height:1.9';
+    var order = (d.order || []).join(' → ') || '（无可用通道）';
+    head.innerHTML = '今日（UTC <b>' + esc(d.day) + '</b>）发信顺序：<b>' + esc(order) + '</b>，发件人 <code>' +
+      esc(d.from || '') + '</code>。前一家失败或当天额度用满会自动降级到下一家。';
+    box.appendChild(head);
+
+    var t = document.createElement('table');
+    t.innerHTML = '<thead><tr><th>通道</th><th>密钥</th><th>今日已发</th><th>免费额度</th><th>今日失败</th></tr></thead>';
+    var tb = document.createElement('tbody');
+    (d.providers || []).forEach(function (p) {
+      var tr = document.createElement('tr');
+      var used = String(p.sent) + (p.cap > 0 && p.sent >= p.cap ? '（已用满）' : '');
+      var cap = p.cap > 0 ? '≤ ' + p.cap + ' 封/天' : '动态（官方未公布固定值）';
+      [p.label, p.ready ? '已配置' : '未配置', used, cap, String(p.failed)].forEach(function (v, i) {
+        var td = document.createElement('td');
+        td.textContent = v;
+        if (i === 1 && !p.ready) { td.style.color = '#b45309'; td.style.fontWeight = '600'; }
+        tr.appendChild(td);
+      });
+      tb.appendChild(tr);
+    });
+    t.appendChild(tb);
+    box.appendChild(t);
+
+    var tip = document.createElement('div');
+    tip.style.cssText = 'color:#7a6f63;font-size:12.5px;margin-top:10px;line-height:1.8';
+    tip.textContent = '新增通道：用 wrangler secret put 配上对应密钥（如 BREVO_API_KEY）后重新部署即可，' +
+      '未配置密钥的通道会被自动跳过。若所有通道都用满，验证码会发送失败。';
+    box.appendChild(tip);
+
+    // 发测试邮件：新配一把密钥后，不用猜能不能投递，直接发一封确认
+    var row = document.createElement('div');
+    row.className = 'form-row';
+    row.style.marginTop = '12px';
+    var inp = document.createElement('input');
+    inp.className = 'grow';
+    inp.placeholder = '收件邮箱（发一封真实测试邮件）';
+    var sel = document.createElement('select');
+    var oAll = document.createElement('option');
+    oAll.value = ''; oAll.textContent = '按自动顺序';
+    sel.appendChild(oAll);
+    (d.providers || []).forEach(function (p) {
+      if (!p.ready) return;
+      var o = document.createElement('option');
+      o.value = p.name; o.textContent = '只用 ' + p.label;
+      sel.appendChild(o);
+    });
+    var btn = document.createElement('button');
+    btn.className = 'btn btn-primary'; btn.type = 'button'; btn.textContent = '发送测试';
+    btn.addEventListener('click', function () {
+      var to = (inp.value || '').trim();
+      if (!to) { toast('请先填写收件邮箱', 'err'); return; }
+      btn.disabled = true;
+      api('/api/admin/mail/test', { method: 'POST', body: { to: to, provider: sel.value } })
+        .then(function (r) { toast('已通过 ' + r.provider + ' 发出，请查收', 'ok'); })
+        .catch(function (e) { toast('发送失败：' + e.message, 'err'); })
+        .then(function () { btn.disabled = false; });
+    });
+    row.appendChild(inp); row.appendChild(sel); row.appendChild(btn);
+    box.appendChild(row);
   }
 
   function renderAdminUsage(d) {

@@ -1,8 +1,12 @@
+ALTER TABLE users ADD COLUMN email TEXT;
+
 -- fblog.cyou 迁移脚本：在已有数据库上执行（幂等，可重复执行）
 -- 在 Cloudflare Dashboard → Workers & Pages → D1 → fblog-dns-db → Console 中粘贴执行
+--
+-- ⚠️ 上面的语句必须放在文件最前面：D1 控制台粘贴时换行会被吃掉，
+--    文件若以 -- 注释开头，整段都会变成注释并报 incomplete input: SQLITE_ERROR。
 
--- 1) users 表：新增邮箱注册相关字段
-ALTER TABLE users ADD COLUMN email TEXT;
+-- 1) users 表：新增邮箱注册相关字段（首列见文件首行）
 ALTER TABLE users ADD COLUMN email_verified INTEGER NOT NULL DEFAULT 0;
 ALTER TABLE users ADD COLUMN status TEXT NOT NULL DEFAULT 'active';
 ALTER TABLE users ADD COLUMN created_via TEXT NOT NULL DEFAULT 'admin';

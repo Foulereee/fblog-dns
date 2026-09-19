@@ -19,13 +19,20 @@ import {
 } from './auth';
 import { validateSubdomain, validateValue, validateProxyTarget, normalizeProxyTarget, validateSlotNote, normalizeSlotNote } from './validate';
 import { CfDns } from './cloudflare';
-import { EmailBinding, sendCodeEmail, sendExpiryReminder, sendResetCodeEmail, sendUsageAlert } from './email';
+import { EmailBinding, SEND_FROM, sendCodeEmail, sendExpiryReminder, sendResetCodeEmail, sendUsageAlert, sendTestEmail, getMailUsage, activeProviders } from './email';
 
 export interface Env {
   DB: D1Database;
   ASSETS: Fetcher;
   EMAIL?: EmailBinding;
   RESEND_API_KEY?: string;
+  /** Brevo 免费 300 封/天（POST https://api.brevo.com/v3/smtp/email，api-key 头） */
+  BREVO_API_KEY?: string;
+  /**
+   * 覆盖邮件通道顺序，逗号分隔，如 "brevo,resend"。
+   * 设置后**只有列出的通道**参与发送；未设置则用默认真实顺序 resend,brevo,cloudflare。
+   */
+  MAIL_PROVIDERS?: string;
   CF_API_TOKEN: string;
   CF_ZONE_ID: string;
   ADMIN_PASSWORD: string;
@@ -796,6 +803,31 @@ async function handleAdminUsage(request: Request, env: Env): Promise<Response> {
   });
 }
 
+/** GET /api/admin/mail —— 各邮件通道的当日用量与配额，用于排查「验证码收不到」 */
+async function handleAdminMail(request: Request, env: Env): Promise<Response> {
+  await requireAdmin(request, env);
+  const u = await getMailUsage(env);
+  return json({
+    day: u.day,
+    from: SEND_FROM,
+    // 实际生效的尝试顺序（受 MAIL_PROVIDERS 影响）
+    order: activeProviders(env).map((p) => p.name),
+    // 全部已知通道，含未配置密钥的（ready=false），便于看清缺哪一把钥匙
+    providers: u.providers,
+  });
+}
+
+/** POST /api/admin/mail/test —— 用指定通道发一封真实测试邮件，确认新密钥是否真的能投递 */
+async function handleAdminMailTest(request: Request, env: Env): Promise<Response> {
+  await requireAdmin(request, env);
+  const body = await readJson(request);
+  const to = String(body?.to ?? '').trim();
+  const provider = body?.provider === undefined || body?.provider === null ? undefined : String(body.provider).trim();
+  if (!EMAIL_RE.test(to)) return json({ error: '收件邮箱格式不正确' }, 400);
+  const r = await sendTestEmail(env, to, provider);
+  return json({ ok: r.delivered, provider: r.provider, tried: r.tried }, r.delivered ? 200 : 502);
+}
+
 async function handleAdminAddReserved(request: Request, env: Env): Promise<Response> {
   await requireAdmin(request, env);
   const body = await readJson(request);
@@ -827,20 +859,37 @@ async function runExpiryReminders(env: Env): Promise<number> {
      FROM subdomains s JOIN users u ON u.id = s.user_id
      WHERE u.email IS NOT NULL AND u.email_verified = 1 AND s.expires_at IS NOT NULL`,
   ).all<{ id: number; name: string; expires_at: number; reminder_level: number; email: string }>();
-  let n = 0;
+
+  // 先按「需要提醒的等级」分组：同一用户当天的多个域名合并成一封邮件，
+  // 而不是每个域名发一封 —— 邮件通道的免费额度很紧（Resend 100 封/天），必须省着用。
+  const byUser = new Map<string, { level: number; items: { id: number; name: string; expiresAt: number; level: number }[] }>();
   for (const r of rows.results ?? []) {
     const remain = r.expires_at - now;
     if (remain <= 0) continue;
     const days = Math.floor(remain / day);
     const level = r.reminder_level ?? 0;
-    let next = level;
+    let next = 0;
+    if (days <= 7 && level < 2) next = 2;
+    else if (days <= 30 && level < 1) next = 1;
+    else continue;
+    const g = byUser.get(r.email) ?? { level: next, items: [] };
+    g.level = Math.max(g.level, next);
+    g.items.push({ id: r.id, name: r.name, expiresAt: r.expires_at, level: next });
+    byUser.set(r.email, g);
+  }
+
+  let n = 0;
+  for (const [email, g] of byUser) {
     try {
-      if (days <= 7 && level < 2) { await sendExpiryReminder(env, r.email, r.name, Math.max(days, 1)); next = 2; }
-      else if (days <= 30 && level < 1) { await sendExpiryReminder(env, r.email, r.name, days); next = 1; }
-      else continue;
-      await env.DB.prepare('UPDATE subdomains SET reminder_level = ?1 WHERE id = ?2').bind(next, r.id).run();
-      n += 1;
-    } catch (e) { console.error(`提醒发送失败 ${r.name}:`, e); }
+      await sendExpiryReminder(env, email, g.items);
+      // 邮件发出去（或已尽力尝试）后，把这一批域名的提醒等级一并推进
+      for (const it of g.items) {
+        await env.DB.prepare('UPDATE subdomains SET reminder_level = ?1 WHERE id = ?2').bind(it.level, it.id).run();
+        n += 1;
+      }
+    } catch (e) {
+      console.error(`提醒发送失败 ${email}:`, e);
+    }
   }
   return n;
 }
@@ -1453,6 +1502,12 @@ export default {
           break;
         case '/api/admin/usage':
           if (request.method === 'GET') return await handleAdminUsage(request, env);
+          break;
+        case '/api/admin/mail':
+          if (request.method === 'GET') return await handleAdminMail(request, env);
+          break;
+        case '/api/admin/mail/test':
+          if (request.method === 'POST') return await handleAdminMailTest(request, env);
           break;
       }
 

@@ -1,9 +1,13 @@
+ALTER TABLE users ADD COLUMN role TEXT NOT NULL DEFAULT 'user';
+
 -- fblog.cyou v2 迁移：卡槽模型 + 管理员 + 保留域名
 -- 在 Cloudflare Dashboard → D1 → fblog-dns-db → Console 中粘贴执行（先备份；测试数据可清）
 -- 说明：将旧的「一条记录=一个域名」改为「卡槽(subdomains) + 记录(records)」分离
+--
+-- ⚠️ 上面的语句必须放在文件最前面：D1 控制台粘贴时换行会被吃掉，
+--    文件若以 -- 注释开头，整段都会变成注释并报 incomplete input: SQLITE_ERROR。
 
--- 1) users 增加角色与卡槽字段
-ALTER TABLE users ADD COLUMN role TEXT NOT NULL DEFAULT 'user';
+-- 1) users 增加角色与卡槽字段（首列见文件首行）
 ALTER TABLE users ADD COLUMN github_star INTEGER NOT NULL DEFAULT 0;
 ALTER TABLE users ADD COLUMN slots_extra INTEGER NOT NULL DEFAULT 0;
 

@@ -1,6 +1,3 @@
--- fblog.cyou 免费二级域名分发平台 - D1 数据库结构 v2（全新安装用）
--- 已有库请执行 migration-v2.sql
-
 CREATE TABLE IF NOT EXISTS users (
   id INTEGER PRIMARY KEY AUTOINCREMENT,
   username TEXT NOT NULL UNIQUE,
@@ -15,6 +12,13 @@ CREATE TABLE IF NOT EXISTS users (
   created_via TEXT NOT NULL DEFAULT 'admin',
   created_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ', 'now'))
 );
+
+-- fblog.cyou 免费二级域名分发平台 - D1 数据库结构 v2（全新安装用）
+-- 已有库请执行 migration-v2.sql
+--
+-- ⚠️ 说明：本文件把注释放在首条语句**之后**。D1 控制台粘贴时换行会被吃掉，
+--    若文件以 -- 注释开头，整段都会变成注释并报 incomplete input: SQLITE_ERROR。
+--    （用 `wrangler d1 execute --file=` 执行则不受此影响。）
 
 CREATE TABLE IF NOT EXISTS reg_codes (
   email TEXT PRIMARY KEY,
@@ -82,6 +86,25 @@ CREATE TABLE IF NOT EXISTS proxy_usage (
   updated_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ', 'now'))
 );
 
+-- 邮件通道当日用量（按 UTC 天 + 通道聚合，用于跳过已达免费额度的通道）
+CREATE TABLE IF NOT EXISTS mail_usage (
+  day TEXT NOT NULL,
+  provider TEXT NOT NULL,
+  sent INTEGER NOT NULL DEFAULT 0,
+  failed INTEGER NOT NULL DEFAULT 0,
+  updated_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ', 'now')),
+  PRIMARY KEY (day, provider)
+);
+
 CREATE INDEX IF NOT EXISTS idx_users_email ON users(email);
 CREATE INDEX IF NOT EXISTS idx_subdomains_user ON subdomains(user_id);
 CREATE INDEX IF NOT EXISTS idx_subdomains_expires ON subdomains(expires_at);
+
+-- 用户名 / 邮箱的**大小写不敏感**唯一约束。
+-- 上面 users 表上的 UNIQUE 用的是 SQLite 默认的二进制比较，'Alice' 与 'alice' 会被
+-- 当成两个不同的值。业务代码在写入前都做了 toLowerCase（注册、验证、管理端建号），
+-- 所以正常情况下不会重复；这两个索引是数据库层的兜底，防止以后新增的写入路径漏掉归一化。
+-- ⚠️ 若库里已存在大小写不同的重复数据，本语句会失败（UNIQUE constraint failed），
+--    需先用 migration-lower-unique.sql 里的诊断语句查出并人工处理。
+CREATE UNIQUE INDEX IF NOT EXISTS idx_users_username_ci ON users(lower(username));
+CREATE UNIQUE INDEX IF NOT EXISTS idx_users_email_ci ON users(lower(email));

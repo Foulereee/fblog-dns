@@ -299,6 +299,53 @@ X-Original-Host: <用户看到的域名>
 
 需要扩容时：**Workers Paid 是 $5 USD/月起**（按账号，含 1000 万请求/月，超出 $0.30/百万；CPU 超出 $0.02/百万 ms），**带宽仍然免费**。D1 若升级：行读 250 亿/月含在内（超出 $0.001/百万）、行写 5000 万/月（超出 $1.00/百万）、存储超 5 GB 后 $0.75/GB-月。
 
+## 邮件通道（多通道自动降级）
+
+注册验证码、找回密码、到期提醒、用量告警都要发邮件，而**免费邮件服务的日配额都很小**（Resend 只有 100 封/天），单靠一家很容易被注册量打满。因此发信被抽象成一串**通道**，按顺序依次尝试，前一家失败或额度用满就自动换下一家，把可用额度叠加起来。
+
+**默认顺序与免费额度**
+
+| 顺序 | 通道 | 需要的密钥 / binding | 免费额度 | 状态 |
+| --- | --- | --- | --- | --- |
+| 1 | Resend | `RESEND_API_KEY` | **100 封/天** + 3000/月（UTC 日重置） | 已接入（`mail.fblog.cyou` 已验证） |
+| 2 | Brevo | `BREVO_API_KEY` | **300 封/天** | 需自行申请密钥 |
+| 3 | Cloudflare Email Service | `send_email` binding（`EMAIL`） | 官方未公布固定数字，按投递信誉动态放宽 | ⚠️ **尚未接入**，见下 |
+
+全部失败时降级为 `console.error` 输出（本地开发可直接从日志里看到验证码）。
+
+**接入第二家（Brevo）**
+
+```bash
+npx wrangler secret put BREVO_API_KEY     # 在 Brevo 后台 → SMTP & API → API Keys 获取
+npx wrangler deploy
+```
+
+Brevo 侧还需把 `mail.fblog.cyou` 加为发件域名并按其要求补 DNS 记录（DKIM / SPF / DMARC）。配好后到**管理后台 → 邮件通道**点「发送测试」，用真实投递确认通道可用 —— 不用猜。
+
+**⚠️ Cloudflare Email Service 目前是失效的**
+
+`wrangler.jsonc` 里虽然声明了 `send_email` binding，但**本 zone 中不存在任何 Cloudflare Email Service 的 DKIM/SPF 记录**，说明发件域名尚未在控制台接入。未接入时该 binding 只能发给「已验证的目标地址」，发给普通注册用户会抛错（代码已捕获，会继续降级）。要启用它，需在 Cloudflare 控制台把 `mail.fblog.cyou` 接入 Email Service 并完成验证。
+
+**调整顺序 / 只启用部分通道**
+
+`wrangler.jsonc` 的 `MAIL_PROVIDERS` 变量（逗号分隔）：
+
+```
+""                → 默认顺序 resend,brevo,cloudflare
+"brevo,resend"    → 优先消耗 Brevo 的 300 封/天，用满再走 Resend
+"brevo"           → 只用 Brevo，其余通道一律不参与
+```
+
+**当日用量计数**
+
+`migration-mail.sql` 建 `mail_usage` 表（按 UTC 天 + 通道）。作用是：某通道当天额度用满后**直接跳过**，省掉一次必然失败的请求。这张表只影响优化 —— **表不存在时发信照常工作**（代码里已 `try/catch` 兜住，写失败只打日志）。
+
+**排查验证码收不到**
+
+`GET /api/admin/mail` 返回各通道的密钥配置情况、当日已发/失败数与生效顺序；`POST /api/admin/mail/test`（`{to, provider?}`）用指定通道发一封真实测试邮件。管理后台「邮件通道」面板是这两个接口的可视化版本。
+
+另外，**到期提醒按用户合并发送**：同一用户的多个域名只发一封，而不是每个域名一封 —— 在额度紧张时这是必要的节省。
+
 ## API 一览
 
 | 方法 | 路径 | 说明 |
@@ -317,6 +364,8 @@ X-Original-Host: <用户看到的域名>
 | POST | `/api/slots/:id/note` | 设置卡槽备注，`{note:"我的博客"}`；传空串表示清除 |
 | POST | `/api/admin/users` | 管理员建号（Bearer ADMIN_PASSWORD） |
 | GET | `/api/admin/usage` | 管理员查看反代用量（近 14 天）与缓存/限流配置 |
+| GET | `/api/admin/mail` | 管理员查看各邮件通道的配置状态、当日用量与生效顺序 |
+| POST | `/api/admin/mail/test` | 管理员发测试邮件 `{to, provider?}`，用真实投递确认通道可用 |
 
 ## 目录结构
 

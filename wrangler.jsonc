@@ -36,7 +36,10 @@
 		}
 	],
 	// Cloudflare Email Service：邮箱注册验证码 / 到期提醒
-	// 需要在 Cloudflare 控制台把发件域名（如 mail.fblog.cyou）接入 Email Service 并验证
+	// ⚠️ 前置条件：必须在控制台把发件域名（mail.fblog.cyou）**接入 Email Service 并验证**。
+	//    未接入时该 binding 只能发给「已验证的目标地址」，发给普通注册用户会抛错。
+	//    目前本 zone 里没有任何 Cloudflare Email Service 的 DKIM/SPF 记录，
+	//    说明尚未接入 —— 也就是说这条通道现在实际是失效的，发信完全靠 Resend。
 	"send_email": [
 		{
 			"name": "EMAIL"
@@ -68,7 +71,11 @@
 		"RATE_LIMIT_PER_MIN": "1200",
 		// 当日反代请求数超过该值时给管理员发一封告警邮件（每天最多一封）。
 		// Workers 免费额度是 100,000/天，留 20% 余量。
-		"USAGE_ALERT_THRESHOLD": "80000"
+		"USAGE_ALERT_THRESHOLD": "80000",
+		// 邮件通道顺序，逗号分隔。设置后**只有列出的通道**参与发送；
+		// 留空则用默认顺序 resend,brevo,cloudflare（按此顺序依次降级）。
+		// 例：只想用 Brevo → "brevo"；把 Brevo 放前面优先消耗它的 300 封/天 → "brevo,resend"。
+		"MAIL_PROVIDERS": ""
 	},
 	// 反代限流：保护平台自己的 Workers 免费额度不被单个站点刷爆。
 	// ⚠️ 官方说明：额度是「单个 Cloudflare 机房内」的限额，不是全局限额 ——

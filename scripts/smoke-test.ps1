@@ -1,6 +1,10 @@
 # fblog-dns local smoke test (run with: npx wrangler dev --port 8787)
+#
+# 管理员口令不写死在脚本里（本仓库会公开，硬编码口令是最典型的泄漏源）�?# 从环境变量读，默认值只�?*本地 dev** 用的占位符，切勿与线�?ADMIN_PASSWORD 相同�?#   $env:ADMIN_PASSWORD = '你的本地dev口令'; .\scripts\smoke-test.ps1
 $ErrorActionPreference = 'Continue'
 $base = 'http://127.0.0.1:8787'
+$adminPwd = if ($env:ADMIN_PASSWORD) { $env:ADMIN_PASSWORD } else { 'local-dev-only-change-me' }
+$adminAuth = @{ Authorization = "Bearer $adminPwd" }
 
 # 1) front page
 try {
@@ -12,7 +16,7 @@ try {
 
 # 2) admin create user
 try {
-  $headers = @{ Authorization = 'Bearer test-admin-password-123' }
+  `$headers = `$adminAuth
   $body = @{ username = 'alice'; password = 'secret12345' } | ConvertTo-Json
   $r = Invoke-RestMethod -Uri "$base/api/admin/users" -Method Post -Headers $headers -ContentType 'application/json' -Body $body
   Write-Host "2) admin create user => OK $($r | ConvertTo-Json -Compress)"
@@ -22,7 +26,7 @@ try {
 
 # 2b) duplicate user should be 409
 try {
-  $headers = @{ Authorization = 'Bearer test-admin-password-123' }
+  `$headers = `$adminAuth
   $body = @{ username = 'alice'; password = 'secret12345' } | ConvertTo-Json
   $null = Invoke-RestMethod -Uri "$base/api/admin/users" -Method Post -Headers $headers -ContentType 'application/json' -Body $body
   Write-Host "2b) duplicate user  => UNEXPECTED OK"

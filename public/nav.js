@@ -77,11 +77,6 @@
       box.appendChild(btn('首页', active === 'landing', '/', { hook: hooks.home }));
       box.appendChild(btn('控制台', active === 'dash', '/#/dash', { hook: hooks.dash }));
 
-      // 当前登录的用户名，放在「退出」左边
-      var who = el('span', 'nav-who', user);
-      who.title = '当前登录账号：' + user;
-      box.appendChild(who);
-
       box.appendChild(btn('退出', false, '#', {
         onClick: function () {
           fetch('/api/logout', { method: 'POST', credentials: 'same-origin' })
@@ -89,6 +84,11 @@
             .catch(function () { if (hooks.logout) hooks.logout(); else location.href = '/'; });
         }
       }));
+
+      // 当前登录的用户名，放在「退出」右边
+      var who = el('span', 'nav-who', user);
+      who.title = '当前登录账号：' + user;
+      box.appendChild(who);
     } else {
       box.appendChild(btn('登录', active === 'login', '/#/login', { hook: hooks.login }));
       box.appendChild(btn('免费注册', active === 'landing' || active === 'register', '/#/register', { hook: hooks.register }));
