@@ -166,15 +166,18 @@ npx wrangler d1 execute fblog-dns-db --remote --file=./migration-proxy.sql
 ```bash
 npx wrangler d1 execute fblog-dns-db --remote --file=./migration-usage.sql
 npx wrangler d1 execute fblog-dns-db --remote --file=./migration-note.sql
+npx wrangler d1 execute fblog-dns-db --remote --file=./migration-txt.sql
+npx wrangler d1 execute fblog-dns-db --remote --file=./migration-mail.sql
 ```
 
 > ⚠️ **粘贴到 D1 Console 的坑**：SQLite 的 `--` 是「注释到行尾」。有些编辑器/网页在粘贴时会把
 > 换行压成一行，此时第一个 `--` 会把后面**全部内容**注释掉，报错是
 > `incomplete input: SQLITE_ERROR` —— 看着像语法错，其实是内容被吃掉了（真实踩过）。
 > 优先用上面的 `--file=` 方式；必须粘贴时，先把所有 `--` 注释删掉。
-> `migration-usage.sql` 已改写成「语句在最前、且为一整行」，压扁也不受影响；
-> 其余迁移文件（`migration.sql`、`migration-v2.sql`、`migration-proxy.sql` 等）**不受此保护**，
-> 请勿直接整段粘贴到 Console。
+>
+> 本仓库**全部 10 个 `.sql` 文件都已改写成「首条语句在最前」**，所以即使换行被压扁，
+> 第一条语句依然会被执行（后续注释才被吃掉）。但「只执行了第一条」仍然是错的 ——
+> 最稳妥的做法始终是用 `--file=`。
 
 > 代价：反代请求会消耗**平台自己**的 Workers 额度（免费 10 万请求/天），且平台能看到这些流量。
 > 额度是**全平台共享**的 —— 一个被刷的站点能拖垮所有人，所以务必确认下文的三个防护已生效。
@@ -242,7 +245,7 @@ X-Original-Host: <用户看到的域名>
 
 ## 六、上线后的安全清单（务必做）
 
-- [ ] 在 Cloudflare **Security → WAF → Rate limiting rules** 加两条免费规则：保护 `/api/login`（如 10 次/分钟/IP）和 `/api/records`（如 30 次/小时/IP）；
+- [ ] 在 Cloudflare **Security → WAF → Rate limiting rules** 加两条免费规则：保护 `/api/login`（如 10 次/分钟/IP）和 `/api/register`（如 30 次/小时/IP）；
 - [ ] **确认反代限流生效**：`node scripts/ratelimit-test.js 300 20 <未注册的随机子域名>`。注意限额是按机房计的，
       生产值下打不出 429 属正常；要确认可用就临时调小 `ratelimits.simple.limit` 后重试；
 - [ ] **确认用量统计可用**：面板「管理后台 → 反向代理用量」能看到今天的请求数；同时确认管理员账号绑定了能收信的邮箱，否则额度告警发不出去；
@@ -252,6 +255,33 @@ X-Original-Host: <用户看到的域名>
 - [ ] 定期检查记录：`npx wrangler d1 execute fblog-dns-db --remote --command "SELECT * FROM records"`，删除僵尸记录；
 - [ ] 扩展保留字表：`src/validate.ts` 的 `RESERVED_SUBDOMAINS`；
 - [ ] 如面向公众开放，补齐正式的 TOS/AUP 页面与滥用举报入口（滥用者会把整个 fblog.cyou 拖下水，甚至触发注册局对整域名的处置）。
+
+## 附加 TXT 记录（域名归属校验）
+
+卡槽除了那一条主记录（A / AAAA / CNAME），还可以额外挂若干条 **TXT 记录**，用于各类
+「域名归属权校验」。典型场景：
+
+| 服务 | 记录名 | 内容 |
+| --- | --- | --- |
+| 阿里云 ESA（给边缘函数绑自定义域名） | `_esaauth` | ESA 控制台给的 `verify_xxx` |
+| 腾讯云 EdgeOne | 控制台告知 | 控制台告知 |
+| Let's Encrypt（DNS-01 方式签证书） | `_acme-challenge` | CA 给出的值 |
+
+实际写入的名字是 `<记录名>.<卡槽名>.<根域名>`。例如卡槽 `blog` 加一条 `_esaauth`，
+落地的就是 `_esaauth.blog.fblog.cyou`。
+
+**为什么单独一张表（`slot_txt`）**：`records` 是「每卡槽 0..1 条」，而校验类 TXT 必须与主记录
+**同时存在** —— 最典型的就是「CNAME 指向 ESA」+「`_esaauth` 的 TXT」这一对，塞进 `records` 会互相顶掉。
+
+**为什么记录名必须强制以 `_` 开头**：这是刻意的安全边界，不是偷懒。下划线前缀不是合法主机名，
+因此它不可能与卡槽自己的主记录、也不可能与其他用户的子域名冲突，更无法用来在某个**真实主机名**上
+伪造 TXT 内容。该限制在服务端强制，绕过前端没用。
+
+**限制**：记录名 ≤ 63 字符、值 ≤ 255 字符且不含控制字符/换行；**每个卡槽最多 5 条**。
+TXT 与反代**不互斥**（反代走 Worker 转发，TXT 只是 DNS 记录），可以同时存在。
+
+**迁移**：需要 `migration-txt.sql`。未执行时不影响解析、发信等主流程，
+只是 TXT 相关接口会返回 503 并提示去跑迁移。
 
 ## 免费额度参考（2025 年起）
 
@@ -354,11 +384,10 @@ Brevo 侧还需把 `mail.fblog.cyou` 加为发件域名并按其要求补 DNS �
 | POST | `/api/login` | 登录（发放的账号） |
 | POST | `/api/logout` | 退出 |
 | GET | `/api/me` | 当前用户 |
-| GET | `/api/records` | 我的记录 |
-| POST | `/api/records` | 创建/更新 `{subdomain, type, value}` |
-| DELETE | `/api/records/:id` | 删除记录 |
-| POST | `/api/slots/:id/record` | 设置/更新该卡槽的 DNS 记录 |
+| POST | `/api/slots/:id/record` | 设置/更新该卡槽的 DNS 记录（`A` / `AAAA` / `CNAME`） |
 | DELETE | `/api/slots/:id/record` | 删除该卡槽的 DNS 记录 |
+| POST | `/api/slots/:id/txt` | 新增/更新附加 TXT 记录，`{name:"_esaauth", value:"verify_xxx"}` |
+| DELETE | `/api/slots/:id/txt/:name` | 删除该条附加 TXT 记录（`:name` 需 URL 编码） |
 | POST | `/api/slots/:id/proxy` | 开启/更新反代，`{target:"https://x.y.workers.dev"}` |
 | DELETE | `/api/slots/:id/proxy` | 关闭反代 |
 | POST | `/api/slots/:id/note` | 设置卡槽备注，`{note:"我的博客"}`；传空串表示清除 |

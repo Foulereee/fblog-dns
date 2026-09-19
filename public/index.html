@@ -730,6 +730,45 @@
       }
       card.appendChild(rf);
 
+      // ---- 附加 TXT 记录：域名归属校验（阿里云 ESA 的 _esaauth、腾讯 EdgeOne、ACME 等）----
+      // 与上面的主记录并存：例如 CNAME 指向 ESA，同时挂一条 _esaauth 的 TXT。
+      var tf = document.createElement('div'); tf.className = 'rec-form';
+      (s.txt || []).forEach(function (t) {
+        var chip = document.createElement('span');
+        chip.style.cssText = 'display:inline-flex;align-items:center;gap:6px;font-size:12px;background:#f3ece0;border:1px solid #e3d9c8;border-radius:6px;padding:4px 8px;max-width:100%';
+        var lbl = document.createElement('code');
+        lbl.style.cssText = 'font-size:11px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:240px';
+        lbl.textContent = t.name + ' = ' + t.value;
+        lbl.title = t.name + '.' + s.name + '.' + state.rootDomain + '  TXT  ' + t.value;
+        var xb = document.createElement('button');
+        xb.type = 'button'; xb.textContent = '\u00d7'; xb.title = '删除这条 TXT';
+        xb.style.cssText = 'border:0;background:transparent;cursor:pointer;font-size:14px;line-height:1;color:#8a7f72;padding:0 2px';
+        xb.addEventListener('click', function () {
+          api('/api/slots/' + s.id + '/txt/' + encodeURIComponent(t.name), { method: 'DELETE' })
+            .then(function () { toast('已删除', 'ok'); loadDash(); })
+            .catch(function (e) { toast(e.message, 'err'); });
+        });
+        chip.appendChild(lbl); chip.appendChild(xb);
+        tf.appendChild(chip);
+      });
+      var tnIn = document.createElement('input');
+      tnIn.placeholder = 'TXT 名称，如 _esaauth'; tnIn.style.flex = '0 0 150px'; tnIn.maxLength = 63;
+      var tvIn = document.createElement('input');
+      tvIn.placeholder = 'TXT 内容（服务商给的校验值）'; tvIn.maxLength = 255;
+      var tBtn = document.createElement('button');
+      tBtn.className = 'btn btn-sm'; tBtn.type = 'button'; tBtn.textContent = '加 TXT';
+      tBtn.addEventListener('click', function () {
+        tBtn.disabled = true;
+        api('/api/slots/' + s.id + '/txt', { method: 'POST', body: { name: tnIn.value, value: tvIn.value } })
+          .then(function () { toast('TXT 已写入', 'ok'); loadDash(); })
+          .catch(function (e) { toast(e.message, 'err'); tBtn.disabled = false; });
+      });
+      var tHint = document.createElement('div');
+      tHint.style.cssText = 'flex-basis:100%;font-size:12px;color:var(--ink-soft);line-height:1.6';
+      tHint.innerHTML = '💡 名称必须以 <code style="font-size:11px">_</code> 开头。接阿里云 ESA 边缘函数时填 <code style="font-size:11px">_esaauth</code>，内容填 ESA 给的 <code style="font-size:11px">verify_xxx</code>；实际写入的是 <code style="font-size:11px">_esaauth.' + s.name + '.' + state.rootDomain + '</code>。';
+      tf.appendChild(tnIn); tf.appendChild(tvIn); tf.appendChild(tBtn); tf.appendChild(tHint);
+      card.appendChild(tf);
+
       // ---- 反代到自己的 Cloudflare Workers / Pages ----
       var fqdn = s.name + '.' + state.rootDomain;
       var pf = document.createElement('div'); pf.className = 'rec-form';

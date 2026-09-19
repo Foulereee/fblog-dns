@@ -70,6 +70,27 @@ CREATE TABLE IF NOT EXISTS records (
   UNIQUE(subdomain_id)
 );
 
+-- 附加 TXT 记录（每卡槽 0..N 条）
+--
+-- 为什么单独一张表：records 是「每卡槽一条」，而校验类 TXT（如阿里云 ESA 的
+-- _esaauth、腾讯 EdgeOne 的归属校验、ACME 的 _acme-challenge）需要与主记录
+-- **同时存在** —— 例如卡槽设了 CNAME 指向 ESA，同时还要有 _esaauth 的 TXT。
+-- 塞进 records 会互相顶掉，所以独立存储。
+--
+-- name 强制以 `_` 开头且只允许这一种形态：下划线前缀不是合法主机名，
+-- 因此不可能与卡槽自身的主记录或其他用户的子域名冲突，也不会被用来
+-- 冒充某个真实主机名。FQDN = `<name>.<卡槽名>.<根域名>`。
+CREATE TABLE IF NOT EXISTS slot_txt (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  subdomain_id INTEGER NOT NULL REFERENCES subdomains(id) ON DELETE CASCADE,
+  name TEXT NOT NULL,
+  value TEXT NOT NULL,
+  cf_record_id TEXT,
+  created_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ', 'now')),
+  updated_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ', 'now')),
+  UNIQUE(subdomain_id, name)
+);
+
 -- 保留域名（管理员设定）
 CREATE TABLE IF NOT EXISTS reserved_subdomains (
   name TEXT PRIMARY KEY,
@@ -99,6 +120,7 @@ CREATE TABLE IF NOT EXISTS mail_usage (
 CREATE INDEX IF NOT EXISTS idx_users_email ON users(email);
 CREATE INDEX IF NOT EXISTS idx_subdomains_user ON subdomains(user_id);
 CREATE INDEX IF NOT EXISTS idx_subdomains_expires ON subdomains(expires_at);
+CREATE INDEX IF NOT EXISTS idx_slot_txt_subdomain ON slot_txt(subdomain_id);
 
 -- 用户名 / 邮箱的**大小写不敏感**唯一约束。
 -- 上面 users 表上的 UNIQUE 用的是 SQLite 默认的二进制比较，'Alice' 与 'alice' 会被

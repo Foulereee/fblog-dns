@@ -133,6 +133,72 @@ export function normalizeProxyTarget(input: string): string {
   return new URL(input.trim()).origin;
 }
 
+// ---------- 附加 TXT 记录 ----------
+
+/**
+ * TXT 记录名的允许形态：**必须以 `_` 开头**。
+ *
+ * 这是刻意的限制，不是疏漏。TXT 只用于各类「域名归属校验」场景
+ * （阿里云 ESA 的 `_esaauth`、腾讯 EdgeOne 的归属校验、ACME 的
+ * `_acme-challenge`、SPF/DMARC 等），这些名字按惯例全部以下划线开头。
+ *
+ * 强制下划线的好处：
+ *   1. 下划线前缀不是合法主机名，因此不可能与卡槽自身的 A/AAAA/CNAME
+ *      记录冲突，也不可能与其他用户的子域名撞名；
+ *   2. 无法用 TXT 在某个真实主机名上伪造内容（例如冒充别人的站点）；
+ *   3. 校验逻辑简单可靠，不需要额外查重。
+ *
+ * 若将来确实需要非下划线开头的 TXT，应先想清冲突与滥用问题再放开。
+ */
+const TXT_NAME_RE = /^_[a-z0-9]([a-z0-9_-]{0,61}[a-z0-9])?$/;
+
+/** TXT 值长度上限：DNS 单条 TXT 字符串的通行上限 */
+export const TXT_VALUE_MAX = 255;
+
+/** 单个卡槽最多允许多少条附加 TXT（防止被拿来当免费存储刷） */
+export const TXT_PER_SLOT_MAX = 5;
+
+/** 校验附加 TXT 的记录名（不含卡槽名与根域名），返回错误信息或 null */
+export function validateTxtName(input: unknown): string | null {
+  if (typeof input !== 'string') return '记录名必须是文本';
+  const n = input.trim().toLowerCase();
+  if (!n) return '记录名不能为空';
+  if (!n.startsWith('_')) {
+    return '记录名必须以 _ 开头（例如 _esaauth，用于域名归属校验）';
+  }
+  if (n.length > 63) return '记录名最长 63 个字符';
+  if (!TXT_NAME_RE.test(n)) {
+    return '记录名只能包含小写字母、数字、下划线和连字符，且不能以连字符结尾';
+  }
+  return null;
+}
+
+/** 规整 TXT 记录名：去空白 + 小写 */
+export function normalizeTxtName(input: unknown): string {
+  return typeof input === 'string' ? input.trim().toLowerCase() : '';
+}
+
+/**
+ * 校验 TXT 记录值，返回错误信息或 null。
+ *
+ * 允许空格与常见可见字符（校验串里确实可能出现），但拒绝控制字符和换行 ——
+ * 换行会被 D1 控制台粘贴、日志与 CSV 导出等环节放大成注入风险，
+ * 且没有哪种归属校验需要它。
+ */
+export function validateTxtValue(input: unknown): string | null {
+  if (typeof input !== 'string') return '记录值必须是文本';
+  const v = input.trim();
+  if (!v) return '记录值不能为空';
+  if (/[\u0000-\u001f\u007f]/.test(v)) return '记录值不能包含控制字符或换行';
+  if (v.length > TXT_VALUE_MAX) return `记录值最长 ${TXT_VALUE_MAX} 个字符`;
+  return null;
+}
+
+/** 规整 TXT 记录值：去首尾空白 */
+export function normalizeTxtValue(input: unknown): string {
+  return typeof input === 'string' ? input.trim() : '';
+}
+
 // ---------- 卡槽备注 ----------
 
 /** 卡槽备注的长度上限（按字符数，不是字节数） */

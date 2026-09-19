@@ -111,7 +111,7 @@
         <li><a href="#edge-cloudflare">边缘节点 · Cloudflare</a></li>
         <li><a href="#edge-aliyun">边缘节点 · 阿里云</a></li>
         <li><a href="#edge-tencent">边缘节点 · 腾讯云</a></li>
-        <li><a href="#edge-choose">三家怎么选</a></li>
+        <li><a href="#edge-choose">四家怎么选</a></li>
         <li><a href="#use-verify">验证与排错</a></li>
       </ol>
     </li>
@@ -192,14 +192,18 @@
     <p>同一个卡槽要么填 DNS 记录，要么开反代。已经开了反代再想填记录，平台会提示「与 DNS 记录互斥」，需要先关闭反代。</p>
   </div>
 
-  <h3 id="use-types">先认识三种记录类型</h3>
-  <p>在「我的子域名」里给卡槽设置记录时，你会看到三种类型，它们的作用完全不同：</p>
+  <h3 id="use-types">先认识记录类型</h3>
+  <p>在「我的子域名」里给卡槽设置记录时，类型下拉里有三种可选，它们的作用完全不同：</p>
   <table>
     <tr><th>类型</th><th>指向什么</th><th>填写示例</th><th>典型场景</th></tr>
     <tr><td><code>A</code></td><td>一个 IPv4 地址</td><td><code>203.0.113.10</code></td><td>有固定公网 IPv4 的 VPS / 云服务器</td></tr>
     <tr><td><code>AAAA</code></td><td>一个 IPv6 地址</td><td><code>2001:db8::1</code></td><td>有 IPv6 的服务器，或开了 IPv6 的家庭宽带</td></tr>
     <tr><td><code>CNAME</code></td><td>另一个域名</td><td><code>myapp.example.com</code></td><td>指向 CDN、边缘平台，或别人给你的域名</td></tr>
+    <tr><td><code>附加 TXT</code></td><td>一段文本</td><td><code>_esaauth</code> → <code>verify_xxx</code></td><td>域名归属校验（ESA / EdgeOne / ACME 等）。它在下拉<b>下方单独一行</b>，可与上面的主记录<b>同时存在</b></td></tr>
   </table>
+  <div class="tip warn"><b>附加 TXT 的记录名必须以 <code>_</code> 开头</b>
+    <p>这是刻意限制：下划线前缀不是合法主机名，所以它不可能和你的主记录、也不可能和其他人的子域名撞名，更没法用来冒充某个真实主机名。实际写入的是 <code>记录名.你的子域名.fblog.cyou</code>。</p>
+  </div>
   <div class="tip"><b>平台创建的记录是「仅 DNS」（灰云）</b>
     <p>也就是说：<b>域名会直接解析到你填的地址，不经过 Cloudflare 代理</b>。Cloudflare 不会替你挡攻击、也不会替你签证书 —— HTTPS 需要你在自己服务器上配置。这是刻意的设计：让记录行为可预期，你自己完全掌控源站。</p>
   </div>
@@ -331,6 +335,25 @@ npx wrangler deploy</code></pre>
   </div>
   <p class="docs"><b>官方文档：</b><a href="https://help.aliyun.com/zh/functioncompute/fc-3-0/user-guide/quick-start" target="_blank" rel="noopener">函数计算 FC 快速入门</a><a href="https://help.aliyun.com/zh/functioncompute/fc-3-0/user-guide/create-a-web-function" target="_blank" rel="noopener">创建 Web 函数</a><a href="https://help.aliyun.com/zh/ens/" target="_blank" rel="noopener">边缘节点服务 ENS</a></p>
 
+  <h4>方向三：ESA（边缘安全加速 · 边缘函数）</h4>
+  <ol>
+    <li>ESA 的<b>边缘函数要绑定自定义域名，前提是账号下已有一个「可用站点」</b>（已购套餐且完成接入）。免费套餐叫 <b>Entrance</b>，<b>0 元、流量与请求数不计费</b>，但<b>只在国际站提供</b>，中国站需付费；</li>
+    <li>添加站点时，<b>加速区域选「全球（不包含中国内地）」</b> —— 选「中国内地」或「全球」都<b>需要 ICP 备案</b>；</li>
+    <li>接入方式<b>务必选 CNAME</b>。不要选 NS 接入 —— 那会把 <code>fblog.cyou</code> 的解析整个搬到 ESA，直接影响本平台；</li>
+    <li>ESA 要求做<b>域名归属权验证</b>：在站点概况复制它给的 TXT（记录名固定为 <code>_esaauth</code>），填进本平台的「<b>附加 TXT 记录</b>」，回 ESA 点验证；</li>
+    <li>验证通过后进入 <b>函数和Pages → 你的函数 → 域名 → 域名绑定 → 添加域名</b>，填入 <code>xxx.fblog.cyou</code>，然后点「查看 DNS 记录」复制 ESA 生成的 <b>CNAME 值</b>；</li>
+    <li>回本平台，用 <b>CNAME 记录</b>把该卡槽指向这个 CNAME 值；等 ESA 侧的 <b>CNAME 状态</b>显示「已配置」即可访问。</li>
+  </ol>
+  <div class="tip warn"><b>ESA 上最容易白折腾的四个点</b>
+    <ul>
+      <li><b>测试环境域名不能当公网入口</b>：<code>*.debug.er.aliyun-esa.net</code> 仅供调试，访问需要 token 且 <b>60 分钟就失效</b>。必须把函数<b>发布到生产环境</b>并绑定自己的域名；</li>
+      <li><b>NS 接入会毁掉本平台</b>：它会接管整个 <code>fblog.cyou</code> 的解析。必须用 CNAME 接入；</li>
+      <li><b>站点没配 SSL/TLS 证书时，绑定域名无法用 HTTPS</b>，记得在站点里申请免费证书；</li>
+      <li><b>每个域名只能在它所属的站点下绑定</b>，且 CNAME 值<b>一域名一个、不可通用</b>。</li>
+    </ul>
+  </div>
+  <p class="docs"><b>官方文档：</b><a href="https://help.aliyun.com/zh/edge-security-acceleration/esa/getting-started/add-your-website-to-esa" target="_blank" rel="noopener">将域名接入 ESA</a><a href="https://help.aliyun.com/zh/edge-security-acceleration/esa/user-guide/trigger" target="_blank" rel="noopener">为函数和Pages配置自定义访问路径</a><a href="https://www.alibabacloud.com/help/zh/edge-security-acceleration/esa/product-overview/about-entrance-plan" target="_blank" rel="noopener">Entrance 免费套餐说明</a></p>
+
   <h3 id="edge-tencent">边缘节点教程 · 腾讯云</h3>
   <p>腾讯云同样是两个方向：</p>
   <table>
@@ -362,7 +385,7 @@ npx wrangler deploy</code></pre>
     <li>参考 <a href="https://cloud.tencent.com/document/product/1552/87601" target="_blank" rel="noopener">从零开始快速接入 EdgeOne</a>，在控制台添加你的站点；</li>
     <li>EdgeOne 会分配一个<b>加速域名</b>给你，并在接入流程里要求你做 <b>CNAME</b> 指向；</li>
     <li>因为 <code>fblog.cyou</code> 不在你的账号下，走不了自动接入。你可以在 EdgeOne 里<b>手动添加 <code>xxx.fblog.cyou</code> 作为自定义域名</b>，然后在<b>本平台</b>用 <b>CNAME 记录</b>指向 EdgeOne 给你的加速域名；</li>
-    <li>按 EdgeOne 的提示完成域名归属校验（通常会给你一条 TXT 记录让你去验证）；</li>
+    <li>按 EdgeOne 的提示完成<b>域名归属校验</b>：EdgeOne 通常给你一条 <b>TXT</b> 记录，把它的记录名与内容填进本平台的「<b>附加 TXT 记录</b>」（记录名必须以 <code>_</code> 开头）即可；</li>
     <li>EdgeOne 侧配置好源站（回源到你的服务器或对象存储）后即可访问。</li>
   </ol>
   <div class="tip"><b>EdgeOne 与平台反代是两条不同的路</b>
@@ -370,13 +393,14 @@ npx wrangler deploy</code></pre>
   </div>
   <p class="docs"><b>官方文档：</b><a href="https://cloud.tencent.com/document/product/583" target="_blank" rel="noopener">云函数 SCF 文档</a><a href="https://cloud.tencent.com/product/scf" target="_blank" rel="noopener">云函数产品页</a><a href="https://cloud.tencent.com/document/product/1552" target="_blank" rel="noopener">EdgeOne 文档</a><a href="https://cloud.tencent.com/document/product/1552/81344" target="_blank" rel="noopener">EdgeOne 边缘函数</a></p>
 
-  <h3 id="edge-choose">三家怎么选？</h3>
+  <h3 id="edge-choose">四家怎么选？</h3>
   <table>
     <tr><th>你的需求</th><th>建议</th></tr>
-    <tr><td>挂个静态页面 / 小 API，想最快跑起来</td><td><b>Cloudflare Workers 或 Pages</b>，免费额度友好、部署最快</td></tr>
-    <tr><td>已有阿里云生态（OSS、RDS 等）</td><td><b>阿里云函数计算 FC</b>，内网互通方便</td></tr>
-    <tr><td>已有腾讯云生态</td><td><b>腾讯云云函数 SCF</b></td></tr>
-    <tr><td>需要边缘加速 + WAF 等安全能力</td><td><b>腾讯云 EdgeOne</b>，走 CNAME 接入</td></tr>
+    <tr><td>挂个静态页面 / 小 API，想最快跑起来</td><td><b>Cloudflare Workers 或 Pages</b>，免费额度友好、部署最快，可直接用平台<b>反代</b></td></tr>
+    <tr><td>已有阿里云生态（OSS、RDS 等）</td><td><b>阿里云函数计算 FC</b>，内网互通方便，可直接用平台<b>反代</b></td></tr>
+    <tr><td>已有腾讯云生态</td><td><b>腾讯云云函数 SCF</b>，可直接用平台<b>反代</b></td></tr>
+    <tr><td>需要边缘加速 + WAF 等安全能力</td><td><b>腾讯云 EdgeOne</b> 或 <b>阿里云 ESA</b>，走 <b>CNAME</b> 接入</td></tr>
+    <tr><td>想用阿里云 ESA 的边缘函数</td><td><b>ESA</b>，需先用<b>国际站</b>免费 Entrance 套餐建站点，再走 CNAME</td></tr>
     <tr><td>有自己服务器、要完全掌控</td><td>直接配 <b>A / AAAA 记录</b>，自己签证书</td></tr>
   </table>
   <div class="tip"><b>统一记住一件事</b>

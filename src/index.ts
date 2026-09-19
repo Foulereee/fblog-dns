@@ -17,7 +17,19 @@ import {
   hashEmailCode,
   usernameFromEmail,
 } from './auth';
-import { validateSubdomain, validateValue, validateProxyTarget, normalizeProxyTarget, validateSlotNote, normalizeSlotNote } from './validate';
+import {
+  validateSubdomain,
+  validateValue,
+  validateProxyTarget,
+  normalizeProxyTarget,
+  validateSlotNote,
+  normalizeSlotNote,
+  validateTxtName,
+  validateTxtValue,
+  normalizeTxtName,
+  normalizeTxtValue,
+  TXT_PER_SLOT_MAX,
+} from './validate';
 import { CfDns } from './cloudflare';
 import { EmailBinding, SEND_FROM, sendCodeEmail, sendExpiryReminder, sendResetCodeEmail, sendUsageAlert, sendTestEmail, getMailUsage, activeProviders } from './email';
 
@@ -496,6 +508,22 @@ async function handleListSlots(request: Request, env: Env): Promise<Response> {
   } catch {
     /* note 列不存在（迁移未执行）：忽略即可 */
   }
+  // 附加 TXT 记录同理单独查一次：slot_txt 表可能还没迁移
+  const txtMap = new Map<number, Array<{ name: string; value: string }>>();
+  try {
+    const rows = await env.DB.prepare(
+      'SELECT t.subdomain_id, t.name, t.value FROM slot_txt t JOIN subdomains s ON s.id = t.subdomain_id WHERE s.user_id = ?1 ORDER BY t.name',
+    )
+      .bind(user.id)
+      .all<{ subdomain_id: number; name: string; value: string }>();
+    for (const r of rows.results ?? []) {
+      const arr = txtMap.get(r.subdomain_id) ?? [];
+      arr.push({ name: r.name, value: r.value });
+      txtMap.set(r.subdomain_id, arr);
+    }
+  } catch {
+    /* slot_txt 表不存在（迁移未执行）：忽略即可 */
+  }
   const out = [];
   for (const s of slots.results ?? []) {
     const rec = await env.DB.prepare('SELECT type, value FROM records WHERE subdomain_id = ?1').bind(s.id).first<{ type: string; value: string }>();
@@ -513,6 +541,7 @@ async function handleListSlots(request: Request, env: Env): Promise<Response> {
       ddns_token: s.ddns_token ?? '',
       proxy_target: proxyTargets.get(s.id) ?? null,
       note: notes.get(s.id) ?? null,
+      txt: txtMap.get(s.id) ?? [],
     });
   }
   return json({ slots: out, rootDomain: env.ROOT_DOMAIN, maxSlots: maxSlotsFor(user) });
@@ -602,6 +631,96 @@ async function handleDeleteRecord(request: Request, env: Env, path: string): Pro
   return json({ ok: true });
 }
 
+/**
+ * 设置 / 更新卡槽的附加 TXT 记录。
+ *
+ * 用途是各类「域名归属校验」：阿里云 ESA 的 `_esaauth`、腾讯 EdgeOne 的
+ * 归属校验、ACME 的 `_acme-challenge` 等。与卡槽的主记录（A/AAAA/CNAME）
+ * 并存互不影响 —— 例如卡槽的 CNAME 指向 ESA，同时挂一条 `_esaauth` 的 TXT。
+ *
+ * 实际写入的名字是 `<name>.<卡槽名>.<根域名>`，例如 `_esaauth.blog.fblog.cyou`。
+ */
+async function handleSetSlotTxt(request: Request, env: Env, path: string): Promise<Response> {
+  const user = await requireUser(request, env);
+  const m = path.match(/^\/api\/slots\/(\d+)\/txt$/);
+  if (!m) return json({ error: 'not found' }, 404);
+  const id = Number(m[1]);
+  const slot = await env.DB.prepare('SELECT id, name FROM subdomains WHERE id = ?1 AND user_id = ?2')
+    .bind(id, user.id)
+    .first<{ id: number; name: string }>();
+  if (!slot) return json({ error: '卡槽不存在或无权操作' }, 404);
+
+  const body = await readJson(request);
+  const name = normalizeTxtName(body?.name);
+  const value = normalizeTxtValue(body?.value);
+  const nerr = validateTxtName(name);
+  if (nerr) return json({ error: nerr }, 400);
+  const verr = validateTxtValue(value);
+  if (verr) return json({ error: verr }, 400);
+
+  let existing: { id: number; cf_record_id: string | null } | null;
+  try {
+    existing = await env.DB.prepare('SELECT id, cf_record_id FROM slot_txt WHERE subdomain_id = ?1 AND name = ?2')
+      .bind(id, name)
+      .first<{ id: number; cf_record_id: string | null }>();
+    // 数量上限只约束「新增」；更新已有那条不受影响
+    if (!existing) {
+      const cnt = await env.DB.prepare('SELECT COUNT(*) AS n FROM slot_txt WHERE subdomain_id = ?1')
+        .bind(id)
+        .first<{ n: number }>();
+      if ((cnt?.n ?? 0) >= TXT_PER_SLOT_MAX) {
+        return json({ error: `每个卡槽最多 ${TXT_PER_SLOT_MAX} 条附加 TXT 记录` }, 400);
+      }
+    }
+  } catch {
+    return json({ error: 'TXT 记录功能尚未启用：请先在 D1 执行 migration-txt.sql' }, 503);
+  }
+
+  const fqdn = `${name}.${slot.name}.${env.ROOT_DOMAIN}`;
+  const cf = new CfDns(env.CF_API_TOKEN, env.CF_ZONE_ID);
+
+  if (existing) {
+    const rec = await withCf('TXT 更新', () => cf.update(existing!.cf_record_id ?? '', { type: 'TXT', name: fqdn, content: value }));
+    await env.DB.prepare('UPDATE slot_txt SET value = ?1, cf_record_id = ?2, updated_at = ?3 WHERE id = ?4')
+      .bind(value, rec.id, new Date().toISOString(), existing.id)
+      .run();
+    return json({ ok: true, updated: true, name, fqdn, value });
+  }
+
+  const rec = await withCf('TXT 写入', () => cf.create({ type: 'TXT', name: fqdn, content: value }));
+  await env.DB.prepare('INSERT INTO slot_txt (subdomain_id, name, value, cf_record_id) VALUES (?1, ?2, ?3, ?4)')
+    .bind(id, name, value, rec.id)
+    .run();
+  return json({ ok: true, created: true, name, fqdn, value });
+}
+
+/** 删除卡槽的某条附加 TXT 记录 */
+async function handleDeleteSlotTxt(request: Request, env: Env, path: string): Promise<Response> {
+  const user = await requireUser(request, env);
+  const m = path.match(/^\/api\/slots\/(\d+)\/txt\/(.+)$/);
+  if (!m) return json({ error: 'not found' }, 404);
+  const id = Number(m[1]);
+  let raw = m[2];
+  try { raw = decodeURIComponent(raw); } catch { /* 非法百分号编码：按原样处理 */ }
+  const name = normalizeTxtName(raw);
+  const slot = await env.DB.prepare('SELECT id FROM subdomains WHERE id = ?1 AND user_id = ?2').bind(id, user.id).first();
+  if (!slot) return json({ error: '卡槽不存在或无权操作' }, 404);
+
+  try {
+    const row = await env.DB.prepare('SELECT id, cf_record_id FROM slot_txt WHERE subdomain_id = ?1 AND name = ?2')
+      .bind(id, name)
+      .first<{ id: number; cf_record_id: string | null }>();
+    if (row) {
+      const cf = new CfDns(env.CF_API_TOKEN, env.CF_ZONE_ID);
+      try { await cf.remove(row.cf_record_id ?? ''); } catch (e) { console.warn('TXT 删除失败（继续）:', e); }
+      await env.DB.prepare('DELETE FROM slot_txt WHERE id = ?1').bind(row.id).run();
+    }
+  } catch {
+    /* 表不存在：等同没有记录 */
+  }
+  return json({ ok: true });
+}
+
 /** 释放卡槽（本人或管理员） */
 async function handleDeleteSlot(request: Request, env: Env, path: string): Promise<Response> {
   const user = await requireUser(request, env);
@@ -615,6 +734,22 @@ async function handleDeleteSlot(request: Request, env: Env, path: string): Promi
   if (rec) {
     const cf = new CfDns(env.CF_API_TOKEN, env.CF_ZONE_ID);
     try { await cf.remove(rec.cf_record_id ?? ''); } catch (e) { console.warn('DNS 删除失败（继续）:', e); }
+  }
+  // 附加 TXT 记录：数据库侧靠 ON DELETE CASCADE 自动清理，但 Cloudflare 侧必须显式删，
+  // 否则会在 zone 里留下孤儿记录，下次同名卡槽申请时被「已被占用」挡住。
+  try {
+    const txts = await env.DB.prepare('SELECT cf_record_id FROM slot_txt WHERE subdomain_id = ?1')
+      .bind(id)
+      .all<{ cf_record_id: string | null }>();
+    const rows = txts.results ?? [];
+    if (rows.length) {
+      const cf = new CfDns(env.CF_API_TOKEN, env.CF_ZONE_ID);
+      for (const t of rows) {
+        try { await cf.remove(t.cf_record_id ?? ''); } catch (e) { console.warn('TXT 删除失败（继续）:', e); }
+      }
+    }
+  } catch {
+    /* slot_txt 表不存在（迁移未执行）：无需清理 */
   }
   await env.DB.prepare('DELETE FROM subdomains WHERE id = ?1').bind(id).run();
   return json({ ok: true });
@@ -1532,6 +1667,14 @@ export default {
       }
       if (request.method === 'POST' && (mm = path.match(/^\/api\/slots\/(\d+)\/ddns-token$/))) {
         return await handleRegenDDNSToken(request, env, path);
+      }
+      if (request.method === 'POST' && (mm = path.match(/^\/api\/slots\/(\d+)\/txt$/))) {
+        return await handleSetSlotTxt(request, env, path);
+      }
+      // 注意：必须排在下面 /api/slots/:id 的通用 DELETE 之前。
+      // 那条正则以 $ 结尾本就匹配不到 /txt/xxx，这里放前面是为了意图明确。
+      if (request.method === 'DELETE' && (mm = path.match(/^\/api\/slots\/(\d+)\/txt\/.+$/))) {
+        return await handleDeleteSlotTxt(request, env, path);
       }
       if (request.method === 'DELETE' && (mm = path.match(/^\/api\/slots\/(\d+)$/))) {
         return await handleDeleteSlot(request, env, path);
